@@ -1,0 +1,12 @@
+.tmp-npm-cache/
+
+# Local environment and runtime data
+.env
+!.env.example
+data/
+storage/
+demo/
+create_user/
+AGENTS.md
+docker-compose.yml.bak
+function_register.md

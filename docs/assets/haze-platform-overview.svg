@@ -1,0 +1,241 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="980" viewBox="0 0 1440 980" role="img" aria-labelledby="title desc">
+  <title id="title">Haze Tool Platform 功能架构图</title>
+  <desc id="desc">展示 Haze Tool Platform 的角色入口、Web 控制台、后端能力、MCP 托管运行时和能力生命周期。</desc>
+  <defs>
+    <linearGradient id="headerGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#155E75"/>
+      <stop offset="0.55" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="consoleGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ECFEFF"/>
+      <stop offset="1" stop-color="#F5F3FF"/>
+    </linearGradient>
+    <linearGradient id="runtimeGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F0FDF4"/>
+      <stop offset="1" stop-color="#FFF7ED"/>
+    </linearGradient>
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#0F172A" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2 2 L10 6 L2 10 Z" fill="#64748B"/>
+    </marker>
+    <style>
+      .page { fill: #F8FAFC; }
+      .hero { fill: url(#headerGradient); }
+      .hero-title { font: 700 42px "Inter", "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif; fill: #FFFFFF; letter-spacing: 0; }
+      .hero-subtitle { font: 400 18px "Inter", "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif; fill: #DBEAFE; letter-spacing: 0; }
+      .panel { fill: #FFFFFF; stroke: #D8E1EE; stroke-width: 1.3; filter: url(#softShadow); }
+      .console-panel { fill: url(#consoleGradient); stroke: #C7D2FE; }
+      .runtime-panel { fill: url(#runtimeGradient); stroke: #BBF7D0; }
+      .section-title { font: 700 22px "Inter", "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif; fill: #0F172A; letter-spacing: 0; }
+      .section-note { font: 400 14px "Inter", "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif; fill: #64748B; letter-spacing: 0; }
+      .card { fill: #FFFFFF; stroke: #CBD5E1; stroke-width: 1.2; }
+      .card-title { font: 700 16px "Inter", "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif; fill: #111827; letter-spacing: 0; }
+      .card-note { font: 400 12.5px "Inter", "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif; fill: #64748B; letter-spacing: 0; }
+      .mini { font: 700 12px "Inter", "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif; fill: #FFFFFF; letter-spacing: 0; }
+      .pill { fill: #EEF2FF; stroke: #C7D2FE; stroke-width: 1; }
+      .pill-green { fill: #ECFDF5; stroke: #A7F3D0; }
+      .pill-amber { fill: #FFFBEB; stroke: #FDE68A; }
+      .pill-red { fill: #FEF2F2; stroke: #FECACA; }
+      .pill-text { font: 600 13px "Inter", "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif; fill: #334155; letter-spacing: 0; }
+      .flow-box { fill: #FFFFFF; stroke: #CBD5E1; stroke-width: 1.1; }
+      .flow-title { font: 700 13px "Inter", "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif; fill: #0F172A; letter-spacing: 0; }
+      .flow-note { font: 400 11.5px "Inter", "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif; fill: #64748B; letter-spacing: 0; }
+      .connector { stroke: #64748B; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .muted-line { stroke: #CBD5E1; stroke-width: 1.4; stroke-dasharray: 6 8; fill: none; }
+      .caption { font: 500 13px "Inter", "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif; fill: #475569; letter-spacing: 0; }
+    </style>
+  </defs>
+
+  <rect class="page" width="1440" height="980"/>
+  <rect class="hero" x="42" y="36" width="1356" height="118" rx="18"/>
+  <text class="hero-title" x="82" y="84">Haze Tool Platform</text>
+  <text class="hero-subtitle" x="84" y="121">Skill / HTTP MCP / STDIO MCP 的能力资产管理、市场分发、托管部署、网关访问与运行监控平台</text>
+  <g transform="translate(1110 66)">
+    <rect x="0" y="0" width="236" height="48" rx="8" fill="#FFFFFF" opacity="0.16"/>
+    <text class="mini" x="18" y="20">FastAPI + React + K8s</text>
+    <text class="mini" x="18" y="39">RBAC · Gateway · Worker</text>
+  </g>
+
+  <g id="roles">
+    <rect class="panel" x="54" y="190" width="254" height="450" rx="12"/>
+    <text class="section-title" x="82" y="230">角色与入口</text>
+    <text class="section-note" x="82" y="254">围绕能力全生命周期协作</text>
+
+    <g transform="translate(82 292)">
+      <rect class="card" x="0" y="0" width="198" height="78" rx="8"/>
+      <circle cx="34" cy="39" r="20" fill="#2563EB"/>
+      <text class="mini" x="23" y="44">DEV</text>
+      <text class="card-title" x="68" y="31">开发者</text>
+      <text class="card-note" x="68" y="53">创建、上传、调试、发布能力</text>
+    </g>
+
+    <g transform="translate(82 398)">
+      <rect class="card" x="0" y="0" width="198" height="78" rx="8"/>
+      <circle cx="34" cy="39" r="20" fill="#D97706"/>
+      <text class="mini" x="23" y="44">OPS</text>
+      <text class="card-title" x="68" y="31">管理员 / 审核员</text>
+      <text class="card-note" x="68" y="53">成员、权限、审核与分类治理</text>
+    </g>
+
+    <g transform="translate(82 504)">
+      <rect class="card" x="0" y="0" width="198" height="78" rx="8"/>
+      <circle cx="34" cy="39" r="20" fill="#059669"/>
+      <text class="mini" x="24" y="44">USE</text>
+      <text class="card-title" x="68" y="31">使用者</text>
+      <text class="card-note" x="68" y="53">搜索市场、收藏、复制接入 Prompt</text>
+    </g>
+  </g>
+
+  <g id="console">
+    <rect class="panel console-panel" x="352" y="190" width="706" height="244" rx="12"/>
+    <text class="section-title" x="386" y="230">Web 控制台</text>
+    <text class="section-note" x="386" y="254">面向平台使用、能力生产和运营管理的一站式界面</text>
+
+    <g transform="translate(386 286)">
+      <rect class="card" x="0" y="0" width="198" height="58" rx="8"/>
+      <text class="card-title" x="18" y="25">首页 / 指南</text>
+      <text class="card-note" x="18" y="45">概览、快速开始、开发文档</text>
+      <rect class="card" x="232" y="0" width="198" height="58" rx="8"/>
+      <text class="card-title" x="250" y="25">开发者中心</text>
+      <text class="card-note" x="250" y="45">Skill/MCP 注册、版本、上传</text>
+      <rect class="card" x="464" y="0" width="198" height="58" rx="8"/>
+      <text class="card-title" x="482" y="25">能力市场</text>
+      <text class="card-note" x="482" y="45">搜索、收藏、文档、下载链接</text>
+
+      <rect class="card" x="0" y="78" width="198" height="58" rx="8"/>
+      <text class="card-title" x="18" y="103">MCP Runtime</text>
+      <text class="card-note" x="18" y="123">实例、监控、部署记录</text>
+      <rect class="card" x="232" y="78" width="198" height="58" rx="8"/>
+      <text class="card-title" x="250" y="103">审核中心</text>
+      <text class="card-note" x="250" y="123">提交审核、通过、驳回</text>
+      <rect class="card" x="464" y="78" width="198" height="58" rx="8"/>
+      <text class="card-title" x="482" y="103">系统 / 个人中心</text>
+      <text class="card-note" x="482" y="123">成员、RBAC、个人服务凭证</text>
+    </g>
+  </g>
+
+  <g id="backend">
+    <rect class="panel" x="352" y="474" width="706" height="208" rx="12"/>
+    <text class="section-title" x="386" y="514">Backend API</text>
+    <text class="section-note" x="386" y="538">FastAPI 模块化后端，统一响应、JWT、RBAC、SQLAlchemy、Alembic</text>
+    <g transform="translate(386 568)">
+      <rect class="pill" x="0" y="0" width="154" height="34" rx="8"/>
+      <text class="pill-text" x="18" y="22">Auth / 4 级 RBAC</text>
+      <rect class="pill" x="170" y="0" width="154" height="34" rx="8"/>
+      <text class="pill-text" x="188" y="22">成员与部门</text>
+      <rect class="pill" x="340" y="0" width="154" height="34" rx="8"/>
+      <text class="pill-text" x="358" y="22">能力资产 / 版本</text>
+      <rect class="pill" x="510" y="0" width="154" height="34" rx="8"/>
+      <text class="pill-text" x="528" y="22">审核与状态机</text>
+
+      <rect class="pill pill-green" x="0" y="50" width="154" height="34" rx="8"/>
+      <text class="pill-text" x="18" y="72">市场 / 收藏 / 文档</text>
+      <rect class="pill pill-green" x="170" y="50" width="154" height="34" rx="8"/>
+      <text class="pill-text" x="188" y="72">下载令牌与凭证</text>
+      <rect class="pill pill-amber" x="340" y="50" width="154" height="34" rx="8"/>
+      <text class="pill-text" x="358" y="72">运行管理 / 指标</text>
+      <rect class="pill pill-amber" x="510" y="50" width="154" height="34" rx="8"/>
+      <text class="pill-text" x="528" y="72">分类与配置</text>
+    </g>
+  </g>
+
+  <g id="runtime">
+    <rect class="panel runtime-panel" x="1110" y="190" width="276" height="492" rx="12"/>
+    <text class="section-title" x="1140" y="230">托管运行面</text>
+    <text class="section-note" x="1140" y="254">部署、路由、鉴权、观测闭环</text>
+
+    <g transform="translate(1140 294)">
+      <rect class="card" x="0" y="0" width="216" height="54" rx="8"/>
+      <text class="card-title" x="18" y="23">Package Storage</text>
+      <text class="card-note" x="18" y="42">图标、能力包、文档 ZIP</text>
+
+      <rect class="card" x="0" y="72" width="216" height="54" rx="8"/>
+      <text class="card-title" x="18" y="95">Deploy Worker</text>
+      <text class="card-note" x="18" y="114">校验 mcp.yaml，构建镜像</text>
+
+      <rect class="card" x="0" y="144" width="216" height="54" rx="8"/>
+      <text class="card-title" x="18" y="167">Image Registry</text>
+      <text class="card-note" x="18" y="186">推送并复用运行镜像</text>
+
+      <rect class="card" x="0" y="216" width="216" height="54" rx="8"/>
+      <text class="card-title" x="18" y="239">Kubernetes Runtime</text>
+      <text class="card-note" x="18" y="258">独立 Deployment / Service</text>
+
+      <rect class="card" x="0" y="288" width="216" height="54" rx="8"/>
+      <text class="card-title" x="18" y="311">MCP Gateway</text>
+      <text class="card-note" x="18" y="330">统一入口、API Key、调用日志</text>
+    </g>
+  </g>
+
+  <path class="connector" d="M308 414 C332 414 328 314 352 314"/>
+  <path class="connector" d="M1058 312 C1082 312 1086 338 1110 338"/>
+  <path class="connector" d="M706 434 L706 474"/>
+  <path class="connector" d="M1058 578 C1084 578 1086 548 1110 548"/>
+
+  <g id="traits">
+    <rect x="54" y="670" width="1258" height="32" rx="8" fill="#FFFFFF" stroke="#D8E1EE"/>
+    <text class="caption" x="76" y="691">核心特点：</text>
+    <rect class="pill" x="150" y="676" width="128" height="20" rx="7"/>
+    <text class="pill-text" x="163" y="691">全生命周期治理</text>
+    <rect class="pill pill-green" x="294" y="676" width="130" height="20" rx="7"/>
+    <text class="pill-text" x="307" y="691">HTTP/STDIO MCP</text>
+    <rect class="pill pill-amber" x="440" y="676" width="116" height="20" rx="7"/>
+    <text class="pill-text" x="453" y="691">K8s 隔离托管</text>
+    <rect class="pill pill-red" x="572" y="676" width="118" height="20" rx="7"/>
+    <text class="pill-text" x="585" y="691">API Key 鉴权</text>
+    <rect class="pill" x="706" y="676" width="132" height="20" rx="7"/>
+    <text class="pill-text" x="719" y="691">个人服务凭证</text>
+    <rect class="pill pill-green" x="854" y="676" width="126" height="20" rx="7"/>
+    <text class="pill-text" x="867" y="691">调用与下载统计</text>
+    <rect class="pill pill-amber" x="996" y="676" width="146" height="20" rx="7"/>
+    <text class="pill-text" x="1009" y="691">本地 / 生产部署指南</text>
+  </g>
+
+  <g id="lifecycle">
+    <rect class="panel" x="54" y="730" width="1332" height="202" rx="12"/>
+    <text class="section-title" x="82" y="770">能力生命周期</text>
+    <text class="section-note" x="82" y="794">从创建、审核、部署到市场消费和运行监控，状态可追踪、动作可治理</text>
+
+    <g transform="translate(82 832)">
+      <rect class="flow-box" x="0" y="0" width="132" height="64" rx="8"/>
+      <text class="flow-title" x="18" y="25">1. 创建能力</text>
+      <text class="flow-note" x="18" y="46">Skill / MCP 元数据</text>
+
+      <path class="connector" d="M140 32 L184 32"/>
+      <rect class="flow-box" x="194" y="0" width="132" height="64" rx="8"/>
+      <text class="flow-title" x="212" y="25">2. 上传资产</text>
+      <text class="flow-note" x="212" y="46">图标、ZIP、文档包</text>
+
+      <path class="connector" d="M334 32 L378 32"/>
+      <rect class="flow-box" x="388" y="0" width="132" height="64" rx="8"/>
+      <text class="flow-title" x="406" y="25">3. 提交审核</text>
+      <text class="flow-note" x="406" y="46">reviewing / approved</text>
+
+      <path class="connector" d="M528 32 L572 32"/>
+      <rect class="flow-box" x="582" y="0" width="132" height="64" rx="8"/>
+      <text class="flow-title" x="600" y="25">4. 托管部署</text>
+      <text class="flow-note" x="600" y="46">Worker + K8s + Registry</text>
+
+      <path class="connector" d="M722 32 L766 32"/>
+      <rect class="flow-box" x="776" y="0" width="132" height="64" rx="8"/>
+      <text class="flow-title" x="794" y="25">5. 调试测试</text>
+      <text class="flow-note" x="794" y="46">连接测试与沙箱验证</text>
+
+      <path class="connector" d="M916 32 L960 32"/>
+      <rect class="flow-box" x="970" y="0" width="132" height="64" rx="8"/>
+      <text class="flow-title" x="988" y="25">6. 发布市场</text>
+      <text class="flow-note" x="988" y="46">Prompt、收藏、下载</text>
+
+      <path class="connector" d="M1110 32 L1154 32"/>
+      <rect class="flow-box" x="1164" y="0" width="132" height="64" rx="8"/>
+      <text class="flow-title" x="1182" y="25">7. 调用监控</text>
+      <text class="flow-note" x="1182" y="46">日志、指标、下线清理</text>
+    </g>
+  </g>
+
+  <path class="muted-line" d="M1230 682 C1230 712 1230 712 1230 730"/>
+  <text class="caption" x="1126" y="724">Gateway 与 Runtime 指标回流至控制台</text>
+</svg>

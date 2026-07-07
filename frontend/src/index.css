@@ -1,0 +1,354 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Space+Grotesk:wght@500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Inter", system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-sidebar-background: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+:root {
+  --background: 210 33% 98%;
+  --foreground: 240 6% 10%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 240 6% 10%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 6% 10%;
+
+  --primary: 240 6% 10%;
+  --primary-foreground: 0 0% 98%;
+
+  --secondary: 210 20% 96%;
+  --secondary-foreground: 240 6% 15%;
+
+  --muted: 210 20% 96%;
+  --muted-foreground: 215 10% 44%;
+
+  --accent: 214 100% 97%;
+  --accent-foreground: 217 80% 48%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+
+  --border: 214 16% 90%;
+  --input: 214 16% 88%;
+  --ring: 217 80% 58%;
+
+  --sidebar-background: 0 0% 100%;
+  --sidebar-foreground: 240 5% 22%;
+  --sidebar-primary: 240 6% 10%;
+  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-accent: 210 20% 96%;
+  --sidebar-accent-foreground: 240 6% 12%;
+  --sidebar-border: 214 16% 91%;
+  --sidebar-ring: 217 80% 58%;
+
+  --radius: 0.875rem;
+
+  --font-latin:
+    "Inter",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  --font-zh:
+    "PingFang SC",
+    "Noto Sans SC",
+    "Microsoft YaHei",
+    "Inter",
+    system-ui,
+    sans-serif;
+
+  --font-ja:
+    "Inter",
+    "Noto Sans JP",
+    "Hiragino Kaku Gothic ProN",
+    "Yu Gothic",
+    system-ui,
+    sans-serif;
+
+  --dashboard-page-padding-x: 0.75rem;
+  --dashboard-page-padding-y: 0.75rem;
+  --dashboard-section-gap: 0.75rem;
+}
+
+@media (min-width: 1536px) {
+  :root {
+    --dashboard-page-padding-x: 1rem;
+    --dashboard-page-padding-y: 1rem;
+  }
+}
+
+@media (max-height: 820px) {
+  :root {
+    --dashboard-page-padding-y: 0.625rem;
+    --dashboard-section-gap: 0.625rem;
+  }
+}
+
+.dashboard-page-content {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding:
+    var(--dashboard-page-padding-y)
+    var(--dashboard-page-padding-x);
+  overflow: hidden;
+}
+
+.dashboard-page-stack {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--dashboard-section-gap);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+html:lang(zh-CN) body {
+  font-family: var(--font-zh);
+}
+
+html:lang(en) body,
+html:lang(es) body {
+  font-family: var(--font-latin);
+}
+
+html:lang(ja) body {
+  font-family: var(--font-ja);
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+button,
+button * {
+  font-weight: 500 !important;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: hsl(var(--foreground));
+  -webkit-box-shadow: 0 0 0 1000px hsl(var(--card)) inset;
+  box-shadow: 0 0 0 1000px hsl(var(--card)) inset;
+  caret-color: hsl(var(--foreground));
+  transition: background-color 9999s ease-out 0s;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+/* Shared typography roles keep page-level type aligned with the global font stack. */
+.text-page-title {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 700;
+}
+
+.text-section-title {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 700;
+}
+
+.text-body {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.text-control,
+.text-table,
+.text-supporting {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.text-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .text-page-title {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+  }
+}
+
+/* Dashboard shell background as requested */
+.dashboard-shell-background {
+  position: relative;
+  min-height: 100vh;
+  background:
+    radial-gradient(
+      circle at 5% 8%,
+      rgba(219, 238, 255, 0.55),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 95% 90%,
+      rgba(232, 242, 255, 0.5),
+      transparent 30%
+    ),
+    hsl(var(--background));
+}
+
+.dashboard-shell-background::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.18;
+  background-image:
+    linear-gradient(
+      rgba(148, 163, 184, 0.12) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(148, 163, 184, 0.12) 1px,
+      transparent 1px
+    );
+  background-size: 64px 64px;
+}
+
+/* 登录页统一排版 */
+
+.login-brand {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.login-title {
+  font-size: 36px;
+  line-height: 44px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.login-subtitle {
+  font-size: 15px;
+  line-height: 24px;
+  font-weight: 400;
+}
+
+.login-control-text {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.login-button-text {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.login-helper-text {
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.login-divider-text {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+}
+
+/* Compact rules for smaller heights (e.g. max-height: 820px) */
+@media (max-height: 820px) {
+  .dashboard-overview {
+    gap: 0.625rem !important;
+  }
+
+  .dashboard-welcome {
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+
+  .dashboard-metric-card {
+    min-height: 0 !important;
+    height: 74px !important;
+  }
+
+  .dashboard-quick-action {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+    height: 60px !important;
+  }
+}
+
