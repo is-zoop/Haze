@@ -8,5 +8,5 @@ storage/
 demo/
 create_user/
 AGENTS.md
-docker-compose.yml.bak
+docker-compose.yml
 function_register.md

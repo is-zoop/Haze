@@ -71,7 +71,7 @@ def _serialize_item(
         tags=extension.get("tags", []),
         calls=calls,
         is_favorite=is_favorite,
-        icon=f"/api/developer/capabilities/{capability.id}/icon" if capability.icon else None,
+        icon=f"/api/marketplace/capabilities/{capability.id}/icon" if capability.icon else None,
         updated_at=capability.updated_at.strftime("%Y-%m-%d"),
     )
 
@@ -114,6 +114,18 @@ def _get_published_capability(db: Session, capability_id: int) -> Capability:
     if capability is None:
         raise AppException(code=4042, message="能力不存在或已下线", status_code=404)
     return capability
+
+
+@router.get("/capabilities/{capability_id}/icon", response_class=FileResponse)
+def get_market_capability_icon(
+    capability_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[User, Depends(require_marketplace_access)],
+) -> FileResponse:
+    capability = _get_published_capability(db, capability_id)
+    if not capability.icon:
+        raise AppException(code=4045, message="Capability icon not found", status_code=404)
+    return FileResponse(resolve_stored_file(capability.icon))
 
 
 def _create_download_link(db: Session, capability: Capability, actor: User) -> DownloadLinkData:

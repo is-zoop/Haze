@@ -45,7 +45,7 @@ def _serialize(
         id=str(c.id), name=c.name, type="Skill" if c.type == "skill" else "MCP",
         description=c.description, author=owners.get(c.owner_id, ""), department=departments.get(c.department_id),
         category_id=c.category_id, category=c.category, calls=call_counts.get(c.id, 0), is_favorite=c.id in favorites,
-        icon=f"/api/developer/capabilities/{c.id}/icon" if c.icon else None,
+        icon=f"/api/marketplace/capabilities/{c.id}/icon" if c.icon else None,
         updated_at=c.updated_at.strftime("%Y-%m-%d"),
         use_count=usage_map[c.id].use_count if c.id in usage_map else None,
         last_used_at=usage_map[c.id].last_used_at.isoformat() if c.id in usage_map else None,

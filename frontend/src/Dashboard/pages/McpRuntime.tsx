@@ -8,6 +8,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableSecondaryText,
 } from "@/components/ui/table";
@@ -483,9 +484,19 @@ export function McpRuntime({ langCode = "ZH" }: PageProps) {
                               <TableCell className="px-4 py-3 text-xs text-muted-foreground">{fmtTime(task.created_at)}</TableCell>
                               <TableCell className="px-4 py-3 text-xs text-muted-foreground">{fmtTime(task.started_at)}</TableCell>
                               <TableCell className="px-4 py-3 text-xs text-muted-foreground">{fmtTime(task.finished_at)}</TableCell>
-                              <TableCell className="px-4 py-3 text-xs text-destructive max-w-[220px] truncate"
-                                title={task.error_message ?? undefined}>
-                                {task.error_message ?? "—"}
+                              <TableCell className="px-4 py-3 text-xs text-destructive max-w-[220px]">
+                                {task.error_message ? (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="block max-w-[220px] cursor-help truncate">
+                                        {task.error_message}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" align="end" className="max-w-md whitespace-pre-wrap break-words bg-neutral-900 text-white border-0 text-xs leading-relaxed">
+                                      {task.error_message}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                ) : "—"}
                               </TableCell>
                             </TableRow>
                           );
