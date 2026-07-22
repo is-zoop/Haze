@@ -244,6 +244,7 @@ export const ja = {
   auditActionFailed: "操作に失敗しました。もう一度お試しください。",
   systemDeleteFailed: "削除に失敗しました",
   developerAssetUpdated: "能力 [{name}] を更新しました",
+  developerAssetPackageUpdated: "能力 [{name}] のデプロイパッケージを更新しました。再デプロイして再テストしてください",
   developerAssetCreated: "新しい能力 [{name}] を作成し、下書きとして保存しました",
   developerAssetSubmitted: "能力 [{name}] をレビューに提出しました",
   developerPublishNotReady: "能力はまだ公開条件を満たしていません",

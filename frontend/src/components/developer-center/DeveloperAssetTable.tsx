@@ -172,8 +172,8 @@ function getFlowActions(asset: DeveloperAsset) {
     canSubmitReview: s === "draft" || s === "rejected",
     canNewVersion: s === "published" || s === "debug_passed" || s === "offline" || s === "deploy_failed",
     showDeploy: isHttp,
-    canDeploy: isHttp && (s === "approved" || s === "deploy_failed"),
-    canDebug: isMcp && (isHttp ? s === "deployed" || s === "debug_failed" : s === "approved" || s === "debug_failed"),
+    canDeploy: isHttp && ["approved", "deploy_failed", "deployed", "debug_failed", "debug_passed"].includes(s ?? ""),
+    canDebug: isMcp && (isHttp ? ["deployed", "debug_failed", "debug_passed"].includes(s ?? "") : s === "approved" || s === "debug_failed"),
     canPublish: isMcp ? (s === "debug_passed" || s === "offline") : (s === "approved" || s === "offline"),
     isPublished: s === "published",
   };

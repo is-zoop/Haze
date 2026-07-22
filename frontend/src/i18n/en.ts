@@ -244,6 +244,7 @@ export const en = {
   auditActionFailed: "Action failed. Please try again.",
   systemDeleteFailed: "Delete failed",
   developerAssetUpdated: "Capability [{name}] updated successfully",
+  developerAssetPackageUpdated: "Deployment package for capability [{name}] updated. Please redeploy and test again",
   developerAssetCreated: "New capability [{name}] created and saved as draft",
   developerAssetSubmitted: "Capability [{name}] submitted for review",
   developerPublishNotReady: "Capability is not ready to be published",

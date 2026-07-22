@@ -320,6 +320,62 @@ def create_capability(db: Session, actor: User, payload: CapabilityCreate) -> Ca
         raise
 
 
+HTTP_MCP_REPLACEABLE_PACKAGE_STATUSES = {"approved", "deploy_failed", "deployed", "debug_failed", "debug_passed"}
+HTTP_MCP_PACKAGE_LOCKED_STATUSES = {"published", "offline"}
+HTTP_MCP_REDEPLOY_STATUSES = {"approved", "deploy_failed", "deployed", "debug_failed", "debug_passed"}
+
+
+def _get_http_mcp_deployment_snapshot_target(
+    db: Session,
+    capability: Capability,
+) -> tuple[CapabilityVersion | None, Any | None]:
+    """Resolve the active deployable version before consuming a one-shot upload token."""
+    if capability.type != "mcp" or _transport(capability) != "HTTP":
+        return None, None
+    if capability.status not in HTTP_MCP_REPLACEABLE_PACKAGE_STATUSES:
+        return None, None
+
+    from app.modules.mcp_runtime.models import McpDeployment
+
+    deployment = db.scalar(select(McpDeployment).where(McpDeployment.capability_id == capability.id))
+    version = db.get(CapabilityVersion, deployment.version_id) if deployment and deployment.version_id else None
+    if version is None:
+        version = db.scalar(
+            select(CapabilityVersion)
+            .where(CapabilityVersion.capability_id == capability.id)
+            .order_by(CapabilityVersion.created_at.desc())
+            .limit(1)
+        )
+    if version is None:
+        raise AppException(code=40912, message="当前部署版本快照不存在，请重新提交版本", status_code=409)
+    return version, deployment
+
+
+def _sync_http_mcp_deployment_snapshot_package(
+    package_meta: dict[str, Any],
+    version: CapabilityVersion | None,
+    deployment: Any | None,
+) -> None:
+    """Keep the deployable version snapshot aligned with a pre-publish HTTP MCP ZIP replacement."""
+    if version is None:
+        return
+
+    from app.modules.mcp_runtime import enums as mcp_enums
+
+    snapshot = deepcopy(version.snapshot_json or {})
+    snapshot_extension = deepcopy(snapshot.get("extension_json") or {})
+    snapshot_extension["package"] = package_meta
+    snapshot["extension_json"] = snapshot_extension
+    version.snapshot_json = snapshot
+
+    if deployment is not None:
+        deployment.image_url = None
+        deployment.last_error = None
+        deployment.deploy_status = mcp_enums.DEPLOY_STATUS_PENDING
+        deployment.actual_status = mcp_enums.ACTUAL_STATUS_PENDING
+        deployment.health_status = mcp_enums.HEALTH_STATUS_UNKNOWN
+        deployment.version_id = version.id
+
 def update_capability(
     db: Session,
     capability_id: int,
@@ -336,9 +392,15 @@ def update_capability(
     icon_upload = None
     package_upload = None
     documentation_upload = None
+    snapshot_version = None
+    snapshot_deployment = None
+    if values.get("package_upload_token"):
+        snapshot_version, snapshot_deployment = _get_http_mcp_deployment_snapshot_target(db, capability)
     if values.get("icon_upload_token"):
         icon_upload = peek_upload(values["icon_upload_token"], actor_id=actor.id, kind="icon")
     if values.get("package_upload_token"):
+        if capability.type == "mcp" and _transport(capability) == "HTTP" and capability.status in HTTP_MCP_PACKAGE_LOCKED_STATUSES:
+            raise AppException(code=40913, message="已发布或已下线的 HTTP MCP 请通过新增版本替换 ZIP", status_code=409)
         package_upload = peek_upload(
             values["package_upload_token"], actor_id=actor.id, kind="package", capability_type=capability.type
         )
@@ -378,6 +440,10 @@ def update_capability(
             )
             created_paths.add(package_path)
             extension["package"] = package_meta
+            if capability.type == "mcp" and _transport(capability) == "HTTP" and capability.status in HTTP_MCP_REPLACEABLE_PACKAGE_STATUSES:
+                capability.status = "approved"
+                extension["recent_test_status"] = "none"
+            _sync_http_mcp_deployment_snapshot_package(package_meta, snapshot_version, snapshot_deployment)
         if documentation_upload:
             old_documentation = (extension.get("documentation") or {}).get("path")
             if old_documentation:
@@ -537,9 +603,8 @@ def deploy_capability(db: Session, capability_id: int, actor: User) -> Capabilit
     if capability.type != "mcp" or _transport(capability) != "HTTP":
         raise AppException(code=4098, message="Only HTTP MCP capabilities require deployment", status_code=409)
 
-    # capability.status 在部署失败时仍保持 approved，故此处只校验 approved
-    if capability.status != "approved":
-        raise AppException(code=4099, message="Capability must be approved before deployment", status_code=409)
+    if capability.status not in HTTP_MCP_REDEPLOY_STATUSES:
+        raise AppException(code=4099, message="Capability must be approved or in pre-publish deployment validation before deployment", status_code=409)
 
     # 读取最新版本，Worker 从该版本的 snapshot 中找到 ZIP 包路径
     latest_version = db.scalar(
@@ -603,7 +668,7 @@ def mark_debug_passed(db: Session, capability_id: int, actor: User) -> Capabilit
     if capability.type != "mcp":
         raise AppException(code=4004, message="Only MCP capabilities require debugging", status_code=400)
     if _transport(capability) == "HTTP":
-        allowed = {"deployed", "debug_failed"}
+        allowed = {"deployed", "debug_failed", "debug_passed"}
     else:
         allowed = {"approved", "debug_failed"}
     if capability.status not in allowed:

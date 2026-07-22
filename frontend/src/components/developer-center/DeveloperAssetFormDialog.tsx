@@ -55,6 +55,10 @@ const ZIP_LOCKED_STATUSES = new Set([
   "deployed", "debug_passed", "debug_failed", "published", "offline",
 ]);
 
+function isHttpMcp(asset: Partial<DeveloperAsset>) {
+  return asset.type === "MCP Server" && asset.transport !== "STDIO";
+}
+
 export function DeveloperAssetFormDialog({
   open,
   onClose,
@@ -72,7 +76,9 @@ export function DeveloperAssetFormDialog({
   onClearZip,
   onClearDocumentation,
 }: DeveloperAssetFormDialogProps) {
-  const isZipLocked = isEditing && ZIP_LOCKED_STATUSES.has(currentAsset.status ?? "");
+  const isZipLocked = isEditing && (isHttpMcp(currentAsset)
+    ? ["published", "offline"].includes(currentAsset.status ?? "")
+    : ZIP_LOCKED_STATUSES.has(currentAsset.status ?? ""));
   const [categories, setCategories] = useState<BusinessCategory[]>([]);
   useEffect(() => { if (open) void listBusinessCategories().then(setCategories); }, [open]);
   return (

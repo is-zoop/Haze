@@ -244,6 +244,7 @@ export const es = {
   auditActionFailed: "Error en la acción. Inténtelo de nuevo.",
   systemDeleteFailed: "Error al eliminar",
   developerAssetUpdated: "Capacidad [{name}] actualizada correctamente",
+  developerAssetPackageUpdated: "Paquete de despliegue de la capacidad [{name}] actualizado. Vuelve a desplegar y probar",
   developerAssetCreated: "Nueva capacidad [{name}] creada y guardada como borrador",
   developerAssetSubmitted: "Capacidad [{name}] enviada a revisión",
   developerPublishNotReady: "La capacidad aún no está lista para publicarse",

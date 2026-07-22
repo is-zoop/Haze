@@ -244,6 +244,7 @@ export const zhCN = {
   auditActionFailed: "操作失败，请重试",
   systemDeleteFailed: "删除失败",
   developerAssetUpdated: "能力 [{name}] 更新成功",
+  developerAssetPackageUpdated: "能力 [{name}] 部署包已更新，请重新部署并测试",
   developerAssetCreated: "新建能力 [{name}] 成功并保存为草稿",
   developerAssetSubmitted: "能力 [{name}] 已提交审核",
   developerPublishNotReady: "能力尚未达到发布条件",

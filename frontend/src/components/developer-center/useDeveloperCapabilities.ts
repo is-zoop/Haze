@@ -30,6 +30,24 @@ import mcpDefaultIcon from "../../assets/images/mcp_icon.png";
 
 const AUTH_TOKEN_KEY = "haze_access_token";
 
+const HTTP_MCP_PACKAGE_EDIT_STATUSES = new Set(["approved", "deploy_failed", "deployed", "debug_failed", "debug_passed"]);
+
+function isHttpMcp(asset: Partial<DeveloperAsset>) {
+  return asset.type === "MCP Server" && asset.transport !== "STDIO";
+}
+
+function isHttpMcpPackageReplacement(asset: Partial<DeveloperAsset>) {
+  return isHttpMcp(asset) && HTTP_MCP_PACKAGE_EDIT_STATUSES.has(asset.status ?? "") && Boolean(asset.packageUploadToken);
+}
+
+function isUploadTokenError(message: string) {
+  return message.includes("Upload token") || message.includes("上传凭证") || message.includes("上传 token");
+}
+
+function isCapabilityCodeError(message: string) {
+  return message.includes("Capability code") || message.includes("Slug") || message.includes("能力编码");
+}
+
 export type AssetTypeFilter = "all" | "Skill" | "MCP Server";
 
 function errorMessage(error: unknown): string {
@@ -361,7 +379,9 @@ export function useDeveloperCapabilities(langCode: "ZH" | "EN" | "JA" | "ES") {
     if (!currentAsset.categoryId) errors.project = "请选择业务分类";
     if (!currentAsset.description?.trim()) errors.description = "能力描述不能为空";
     else if (currentAsset.description.length > 300) errors.description = "能力描述不能超过 300 个字符";
-    const zipLocked = isEditing && ["deployed", "debug_passed", "debug_failed", "published", "offline"].includes(currentAsset.status ?? "");
+    const zipLocked = isEditing && (isHttpMcp(currentAsset)
+      ? ["published", "offline"].includes(currentAsset.status ?? "")
+      : ["deployed", "debug_passed", "debug_failed", "published", "offline"].includes(currentAsset.status ?? ""));
     const hasExistingPackage = isEditing && Boolean(currentAsset.zipName || currentAsset.zipFiles?.length);
     if (!zipLocked && !currentAsset.packageUploadToken && !hasExistingPackage) errors.zipName = "能力 ZIP 文件必填";
     return errors;
@@ -392,11 +412,26 @@ export function useDeveloperCapabilities(langCode: "ZH" | "EN" | "JA" | "ES") {
       if (isEditing) await updateCapability(assetToSave);
       else await createCapability(assetToSave);
       setShowEditModal(false);
-      triggerFlashAlert({ type: "success", title: t.alertSaveSuccessTitle, description: formatAlert(isEditing ? t.developerAssetUpdated : t.developerAssetCreated, { name: currentAsset.name ?? "" }) });
+      triggerFlashAlert({
+        type: "success",
+        title: t.alertSaveSuccessTitle,
+        description: formatAlert(
+          isHttpMcpPackageReplacement(currentAsset)
+            ? t.developerAssetPackageUpdated
+            : isEditing ? t.developerAssetUpdated : t.developerAssetCreated,
+          { name: currentAsset.name ?? "" },
+        ),
+      });
       refresh();
     } catch (error) {
       const message = errorMessage(error);
-      if (error instanceof ApiError && error.status === 409) setFormErrors((previous) => ({ ...previous, code: message }));
+      if (error instanceof ApiError && error.status === 409 && isCapabilityCodeError(message)) {
+        setFormErrors((previous) => ({ ...previous, code: message }));
+      }
+      if (currentAsset.packageUploadToken && isUploadTokenError(message)) {
+        setCurrentAsset((previous) => ({ ...previous, packageUploadToken: undefined }));
+        setFormErrors((previous) => ({ ...previous, zipName: "ZIP 上传凭证已失效，请重新上传 ZIP 文件" }));
+      }
       triggerFlashAlert({ type: "error", title: t.alertOperationFailedTitle, description: message });
     }
   };
