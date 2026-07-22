@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import {
   BookOpen,
@@ -161,6 +161,71 @@ const formatCalls = (calls: number) => {
   }
   return String(calls);
 };
+
+function ResponsiveTagList({ tags }: { tags: string[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
+  const [visibleCount, setVisibleCount] = useState(tags.length);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const measureContainer = measureRef.current;
+    if (!container || !measureContainer) return;
+
+    const updateVisibleCount = () => {
+      const tagWidths = Array.from(measureContainer.querySelectorAll<HTMLElement>("[data-tag-measure]"), (node) => node.offsetWidth);
+      const overflowWidths = Array.from(measureContainer.querySelectorAll<HTMLElement>("[data-overflow-measure]"), (node) => node.offsetWidth);
+      const gap = 6;
+      const availableWidth = container.clientWidth;
+      const allTagsWidth = tagWidths.reduce((total, width) => total + width, 0) + Math.max(0, tagWidths.length - 1) * gap;
+
+      if (allTagsWidth <= availableWidth) {
+        setVisibleCount(tags.length);
+        return;
+      }
+
+      for (let count = tags.length - 1; count >= 0; count -= 1) {
+        const hiddenCount = tags.length - count;
+        const visibleTagsWidth = tagWidths.slice(0, count).reduce((total, width) => total + width, 0);
+        const itemCount = count + 1;
+        const requiredWidth = visibleTagsWidth + overflowWidths[hiddenCount - 1] + Math.max(0, itemCount - 1) * gap;
+        if (requiredWidth <= availableWidth) {
+          setVisibleCount(count);
+          return;
+        }
+      }
+
+      setVisibleCount(0);
+    };
+
+    updateVisibleCount();
+    const resizeObserver = new ResizeObserver(updateVisibleCount);
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, [tags]);
+
+  const badgeClassName = "h-5 shrink-0 rounded-md border-none bg-slate-50/80 px-1.5 text-xs font-bold text-slate-500";
+  const hiddenCount = tags.length - visibleCount;
+
+  return (
+    <div ref={containerRef} className="relative mb-3 flex min-w-0 items-center gap-1.5 overflow-hidden">
+      {tags.slice(0, visibleCount).map((tag) => (
+        <Badge key={tag} variant="secondary" className={badgeClassName}>{tag}</Badge>
+      ))}
+      {hiddenCount > 0 && (
+        <Badge variant="secondary" className={badgeClassName}>+{hiddenCount}</Badge>
+      )}
+      <div ref={measureRef} aria-hidden="true" className="invisible absolute left-0 top-0 flex items-center gap-1.5 whitespace-nowrap">
+        {tags.map((tag) => (
+          <Badge key={tag} data-tag-measure variant="secondary" className={badgeClassName}>{tag}</Badge>
+        ))}
+        {tags.map((_, index) => (
+          <Badge key={index} data-overflow-measure variant="secondary" className={badgeClassName}>+{index + 1}</Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const getCategoryLabel = (categoryId: string, langCode: string) => {
   const translations: Record<string, Record<string, string>> = {
@@ -669,8 +734,8 @@ export function Market({
                         key={item.id}
                         className="flex flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white p-4 shadow-3xs hover:border-slate-300 hover:shadow-2xs transition-all duration-200"
                       >
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div className="flex items-center gap-3 min-w-0">
+                        <div className="mb-3 flex items-start justify-between gap-3">
+                          <div className="flex min-w-0 flex-1 items-center gap-3">
                             <span className={cn(
                               "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg shadow-3xs overflow-hidden",
                               item.isMcp ? "bg-violet-50 text-violet-700" : "bg-blue-50 text-blue-700"
@@ -680,19 +745,7 @@ export function Market({
                                 : item.isMcp ? <Cpu className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
                             </span>
                             <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <h4 className="font-extrabold text-slate-800 text-sm truncate max-w-[130px]">{display.name}</h4>
-                                <button
-                                  className="h-6 w-6 shrink-0 text-slate-400 hover:text-amber-500 transition-colors flex items-center justify-center cursor-pointer"
-                                  onClick={() => toggleFavorite(item.id, item.isMcp)}
-                                  aria-label={item.isFavorite
-                                    ? (_langCode === "ZH" ? "取消收藏" : _langCode === "JA" ? "お気に入り解除" : _langCode === "ES" ? "Quitar de favoritos" : "Remove from Favorites")
-                                    : (_langCode === "ZH" ? "收藏" : _langCode === "JA" ? "お気に入り登録" : _langCode === "ES" ? "Añadir a favoritos" : "Add to Favorites")
-                                  }
-                                >
-                                  <Star className={cn("h-3.5 w-3.5", item.isFavorite && "fill-amber-400 text-amber-500")} />
-                                </button>
-                              </div>
+                              <h4 className="truncate text-sm font-extrabold text-slate-800">{display.name}</h4>
                               <div className="mt-1">
                                 <Badge variant="outline" className={cn("inline-flex h-4 items-center rounded-md px-1.5 text-xs font-black border-none shrink-0",
                                   item.isMcp ? "bg-violet-50 text-violet-600" : "bg-blue-50 text-blue-600"
@@ -702,26 +755,23 @@ export function Market({
                               </div>
                             </div>
                           </div>
+                          <button
+                            className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center text-slate-400 transition-colors hover:text-amber-500"
+                            onClick={() => toggleFavorite(item.id, item.isMcp)}
+                            aria-label={item.isFavorite
+                              ? (_langCode === "ZH" ? "取消收藏" : _langCode === "JA" ? "お気に入り解除" : _langCode === "ES" ? "Quitar de favoritos" : "Remove from Favorites")
+                              : (_langCode === "ZH" ? "收藏" : _langCode === "JA" ? "お気に入り登録" : _langCode === "ES" ? "Añadir a favoritos" : "Add to Favorites")
+                            }
+                          >
+                            <Star className={cn("h-3.5 w-3.5", item.isFavorite && "fill-amber-400 text-amber-500")} />
+                          </button>
                         </div>
 
                         <p className="text-xs text-slate-500 leading-relaxed line-clamp-2 h-[34px] mb-3 text-left">
                           {display.description}
                         </p>
 
-                        <div className="flex flex-wrap items-center gap-1.5 mb-3">
-                          {display.tags.slice(0, 2).map((tag) => (
-                            <Fragment key={tag}>
-                              <Badge variant="secondary" className="h-5 rounded-md px-1.5 text-xs text-slate-500 bg-slate-50/80 font-bold border-none">
-                                {tag}
-                              </Badge>
-                            </Fragment>
-                          ))}
-                          {display.tags.length > 2 && (
-                            <Badge variant="secondary" className="h-5 rounded-md px-1.5 text-xs text-slate-500 bg-slate-50/80 font-bold border-none">
-                              +{display.tags.length - 2}
-                            </Badge>
-                          )}
-                        </div>
+                        <ResponsiveTagList tags={display.tags} />
 
                         <div className="mt-auto flex shrink-0 flex-col gap-3 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
                           <div className="truncate text-xs text-slate-500">

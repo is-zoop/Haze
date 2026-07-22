@@ -33,6 +33,7 @@ router = APIRouter(prefix="/api/marketplace", tags=["marketplace"])
 public_router = APIRouter(prefix="/api/public", tags=["public-downloads"])
 
 MARKET_CONTENT_FILES = {"quick_start.md", "README.md"}
+MARKET_PROMPT_FILE = "Prompt.md"
 MAX_MARKET_CONTENT_SIZE = 1024 * 1024
 PROMPT_TEMPLATE_DIR = Path(__file__).resolve().parent / "templates" / "capability-prompts"
 
@@ -78,8 +79,8 @@ def _serialize_item(
 
 
 
-def _render_access_prompt(
-    template_name: str,
+def _render_prompt_template(
+    template: str,
     *,
     ability_name: str,
     version: str,
@@ -87,11 +88,6 @@ def _render_access_prompt(
     server_url: str | None = None,
     personal_credential: str | None = None,
 ) -> str:
-    template_path = PROMPT_TEMPLATE_DIR / template_name
-    try:
-        template = template_path.read_text(encoding="utf-8-sig")
-    except OSError as exc:
-        raise AppException(code=5001, message="接入 Prompt 模板不存在", status_code=500) from exc
     return (
         template
         .replace("{{ABILITY_NAME}}", ability_name)
@@ -101,6 +97,18 @@ def _render_access_prompt(
         .replace("{{PERSONAL_CREDENTIAL}}", personal_credential or "")
         .strip()
     )
+
+
+def _render_access_prompt(
+    template_name: str,
+    **values: str | None,
+) -> str:
+    template_path = PROMPT_TEMPLATE_DIR / template_name
+    try:
+        template = template_path.read_text(encoding="utf-8-sig")
+    except OSError as exc:
+        raise AppException(code=5001, message="接入 Prompt 模板不存在", status_code=500) from exc
+    return _render_prompt_template(template, **values)
 
 
 def _get_published_capability(db: Session, capability_id: int) -> Capability:
@@ -286,25 +294,16 @@ def get_capability_access_prompt(
     cap_type = "Skill" if capability.type == "skill" else "MCP"
     download: DownloadLinkData | None = None
     server_url: str | None = None
+    personal_credential: str | None = None
 
     if capability.type == "skill":
         download = _create_download_link(db, capability, actor)
         access_mode = "skill_download"
-        prompt = _render_access_prompt(
-            "skill.md",
-            ability_name=capability.name,
-            version=capability.version,
-            download_url=download.download_url,
-        )
+        template_name = "skill.md"
     elif transport == "STDIO":
         download = _create_download_link(db, capability, actor)
         access_mode = "stdio_mcp_download"
-        prompt = _render_access_prompt(
-            "stdio-mcp.md",
-            ability_name=capability.name,
-            version=capability.version,
-            download_url=download.download_url,
-        )
+        template_name = "stdio-mcp.md"
     else:
         deployment_url = db.scalar(select(McpDeployment.public_url).where(McpDeployment.capability_id == capability.id))
         server_url = deployment_url or str(config.get("serverUrl") or "") or None
@@ -313,13 +312,24 @@ def get_capability_access_prompt(
         credential = _get_or_create_mcp_credential(db, actor)
         if not credential.key_raw:
             raise AppException(code=4006, message="个人服务凭证不可用", status_code=400)
+        personal_credential = credential.key_raw
         access_mode = "http_mcp"
+        template_name = "http-mcp.md"
+
+    prompt_values = {
+        "ability_name": capability.name,
+        "version": capability.version,
+        "download_url": download.download_url if download else None,
+        "server_url": server_url,
+        "personal_credential": personal_credential,
+    }
+    custom_prompt, _ = _read_documentation_text(capability, MARKET_PROMPT_FILE)
+    if custom_prompt:
+        prompt = _render_prompt_template(custom_prompt, **prompt_values)
+    else:
         prompt = _render_access_prompt(
-            "http-mcp.md",
-            ability_name=capability.name,
-            version=capability.version,
-            server_url=server_url,
-            personal_credential=credential.key_raw,
+            template_name,
+            **prompt_values,
         )
 
     return success_response(request, AccessPromptData(
@@ -415,9 +425,7 @@ def download_capability_package(
     return FileResponse(package_file, media_type="application/zip", filename=file_name)
 
 
-def _read_market_content(capability: Capability, file_name: str) -> tuple[str | None, str]:
-    if file_name not in MARKET_CONTENT_FILES:
-        return None, ""
+def _read_documentation_text(capability: Capability, file_name: str) -> tuple[str | None, str]:
     documentation = (capability.extension_json or {}).get("documentation") or {}
     package_path = documentation.get("path")
     if not package_path:
@@ -440,6 +448,12 @@ def _read_market_content(capability: Capability, file_name: str) -> tuple[str | 
             return archive.read(target).decode("utf-8-sig"), base_path
     except (BadZipFile, UnicodeDecodeError, OSError):
         return None, ""
+
+
+def _read_market_content(capability: Capability, file_name: str) -> tuple[str | None, str]:
+    if file_name not in MARKET_CONTENT_FILES:
+        return None, ""
+    return _read_documentation_text(capability, file_name)
 
 
 @router.get("/capabilities/{capability_id}/content", response_model=ApiResponse[MarketContentData])

@@ -104,6 +104,16 @@ def _upload_package(client: TestClient, headers: dict[str, str], capability_type
     return response.json()["data"]
 
 
+def _upload_documentation(client: TestClient, headers: dict[str, str], files: dict[str, str]) -> dict:
+    response = client.post(
+        "/api/developer/uploads/documentation",
+        headers=headers,
+        files={"file": ("documentation.zip", _zip_bytes(files), "application/zip")},
+    )
+    assert response.status_code == 200, response.text
+    return response.json()["data"]
+
+
 def _create_capability(
     client: TestClient,
     headers: dict[str, str],
@@ -256,6 +266,60 @@ def _create_stdio_mcp(client: TestClient, headers: dict[str, str], *, code: str)
     )
     assert response.status_code == 200, response.text
     return response.json()["data"]
+
+
+def test_market_access_prompt_prefers_documentation_prompt_md(capability_client) -> None:
+    client, headers, session_factory = capability_client
+    custom = _create_capability(client, headers["dev1"], code="prompt_skill", capability_type="skill")
+    documentation = _upload_documentation(
+        client,
+        headers["dev1"],
+        {
+            "docs/Prompt.md": (
+                "自定义接入 {{ABILITY_NAME}}\n"
+                "版本 {{VERSION}}\n"
+                "下载 {{DOWNLOAD_URL}}\n"
+                "服务 {{SERVER_URL}}\n"
+                "凭证 {{PERSONAL_CREDENTIAL}}"
+            ),
+            "docs/README.md": "# Usage",
+        },
+    )
+    updated = client.patch(
+        f"/api/developer/capabilities/{custom['id']}",
+        headers=headers["dev1"],
+        json={"documentation_upload_token": documentation["upload_token"]},
+    )
+    assert updated.status_code == 200, updated.text
+    fallback = _create_capability(client, headers["dev1"], code="fallback_skill", capability_type="skill")
+
+    with session_factory() as session:
+        for capability_id in (custom["id"], fallback["id"]):
+            capability = session.get(Capability, int(capability_id))
+            assert capability is not None
+            capability.status = "published"
+        session.commit()
+
+    custom_response = client.get(
+        f"/api/marketplace/capabilities/{custom['id']}/access-prompt",
+        headers=headers["dev1"],
+    )
+    assert custom_response.status_code == 200, custom_response.text
+    custom_data = custom_response.json()["data"]
+    assert custom_data["prompt"].startswith("自定义接入 Capability prompt_skill")
+    assert "版本 1.0.0" in custom_data["prompt"]
+    assert custom_data["download_url"] in custom_data["prompt"]
+    assert "TODO_MCP Server地址未配置" in custom_data["prompt"]
+    assert "{{" not in custom_data["prompt"]
+
+    fallback_response = client.get(
+        f"/api/marketplace/capabilities/{fallback['id']}/access-prompt",
+        headers=headers["dev1"],
+    )
+    assert fallback_response.status_code == 200, fallback_response.text
+    fallback_prompt = fallback_response.json()["data"]["prompt"]
+    assert fallback_prompt.startswith("请帮我安装并使用 Skill")
+    assert "自定义接入" not in fallback_prompt
 
 
 def test_capability_status_flow_by_type(capability_client) -> None:

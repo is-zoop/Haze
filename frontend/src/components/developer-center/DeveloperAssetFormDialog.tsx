@@ -347,7 +347,7 @@ export function DeveloperAssetFormDialog({
                     onUploaded={onDocumentationUploaded}
                     onClear={onClearDocumentation}
                     error={formErrors.documentation}
-                    placeholderDesc="支持 zip 文件，可包含 quick_start.md、README.md、图片及其他说明文档，大小不超过 10MB"
+                    placeholderDesc="支持 zip 文件，可包含 quick_start.md、README.md、Prompt.md、图片及其他说明文档，大小不超过 10MB"
                     inputId="documentation-zip-file-input"
                   />
                 </FormField>
