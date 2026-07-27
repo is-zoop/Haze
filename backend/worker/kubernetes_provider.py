@@ -230,6 +230,20 @@ class KubernetesRuntimeProvider:
         self._create_or_patch("service", name, ns, service)
 
         # ── NetworkPolicy ─────────────────────────────────────────────────────
+        ingress_peers = [
+            kubernetes.client.V1NetworkPolicyPeer(
+                namespace_selector=kubernetes.client.V1LabelSelector(
+                    match_labels={"kubernetes.io/metadata.name": "haze-system"}
+                )
+            )
+        ]
+        if s.k8s_docker_network_cidr:
+            ingress_peers.append(
+                kubernetes.client.V1NetworkPolicyPeer(
+                    ip_block=kubernetes.client.V1IPBlock(cidr=s.k8s_docker_network_cidr)
+                )
+            )
+
         netpol_name = f"{name}-netpol"
         netpol = kubernetes.client.V1NetworkPolicy(
             metadata=kubernetes.client.V1ObjectMeta(
@@ -243,15 +257,7 @@ class KubernetesRuntimeProvider:
                 policy_types=["Ingress", "Egress"],
                 ingress=[
                     kubernetes.client.V1NetworkPolicyIngressRule(
-                        _from=[
-                            kubernetes.client.V1NetworkPolicyPeer(
-                                namespace_selector=kubernetes.client.V1LabelSelector(
-                                    match_labels={
-                                        "kubernetes.io/metadata.name": "haze-system"
-                                    }
-                                )
-                            )
-                        ]
+                        _from=ingress_peers
                     )
                 ],
                 egress=[
@@ -287,14 +293,18 @@ class KubernetesRuntimeProvider:
             # 生产：Gateway Pod 与 MCP Pod 同在集群内，直接用集群 DNS
             internal_url = f"http://{name}.{ns}.svc.cluster.local:{port}{endpoint}"
         else:
+            svc = self._core.read_namespaced_service(name, ns)
+            node_port = svc.spec.ports[0].node_port
+            nodeport_base = s.k8s_nodeport_base_url.rstrip("/")
             proxy_base = s.k8s_proxy_base_url.rstrip("/")
-            if proxy_base:
-                # kubectl proxy 模式（Windows kind 开发环境，需先运行 kubectl proxy --port=8090）
+            if nodeport_base:
+                # Docker Worker 直连 NodePort，保留标准 Authorization 到 MCP Pod。
+                internal_url = f"{nodeport_base}:{node_port}{endpoint}"
+            elif proxy_base:
+                # 兼容 kubectl proxy 模式（需先运行 kubectl proxy --port=8090）。
                 internal_url = f"{proxy_base}/api/v1/namespaces/{ns}/services/{name}:{port}/proxy{endpoint}"
             else:
-                # NodePort 模式（Linux 宿主机开发，localhost:NodePort 直接可达）
-                svc = self._core.read_namespaced_service(name, ns)
-                node_port = svc.spec.ports[0].node_port
+                # NodePort 模式（Linux 宿主机开发，localhost:NodePort 直接可达）。
                 internal_url = f"http://localhost:{node_port}{endpoint}"
 
         return image, name, internal_url

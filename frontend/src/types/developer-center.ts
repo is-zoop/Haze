@@ -58,6 +58,8 @@ export interface DeveloperAsset {
   serverUrl?: string;
   startCommand?: string;
   startArgs?: string;
+  mcpConfigVersion?: string;
+  requiresPersonalCredential?: boolean;
   healthCheckUrl?: string;
   credentialRef?: string;
   averageResponseTime?: number;

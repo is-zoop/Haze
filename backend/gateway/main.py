@@ -91,13 +91,19 @@ def _parse_mcp_body(body: bytes) -> tuple[str | None, str | None]:
         return None, None
 
 
-def _build_forward_headers(headers, request_id: str, asset_code: str) -> dict:
-    """透传 MCP 请求头；受信任能力额外使用内部头传递个人凭证。"""
+def _build_forward_headers(
+    headers,
+    request_id: str,
+    asset_code: str,
+    requires_personal_credential: bool,
+) -> dict:
+    """透传 MCP 请求头；声明需要个人凭证的能力接收标准 Authorization。"""
     trusted_assets = {
         item.strip()
         for item in get_gateway_settings().trusted_mcp_credential_passthrough.split(",")
         if item.strip()
     }
+    legacy_trusted = asset_code in trusted_assets
     result = {}
     personal_credential = None
     for k, v in headers.items():
@@ -107,16 +113,16 @@ def _build_forward_headers(headers, request_id: str, asset_code: str) -> dict:
         if lk == "authorization" and v.lower().startswith(
             f"bearer {MCP_KEY_PREFIX}"
         ):
-            if asset_code not in trusted_assets:
-                continue  # 非受信任能力不透传个人凭证
-            personal_credential = v
+            if not (requires_personal_credential or legacy_trusted):
+                continue  # 未声明且不在兼容白名单时不透传个人凭证
+            if legacy_trusted:
+                personal_credential = v
         if lk in ("content-type", "accept", "authorization") or lk.startswith("x-mcp-"):
             result[k] = v
     if personal_credential:
         result["X-Haze-Personal-Credential"] = personal_credential
     result["X-Request-ID"] = request_id
     return result
-
 
 async def _forward_request(
     target_url: str,
@@ -243,10 +249,20 @@ async def mcp_post(asset_code: str, request: Request):
         target_url = route.target_url
         capability_id = route.capability_id
         deployment_id = route.deployment_id
+        config = (cap.extension_json or {}).get("config", {})
+        requires_personal_credential = (
+            isinstance(config, dict)
+            and config.get("requiresPersonalCredential") is True
+        )
 
     # ── 异步代理转发
     settings = get_gateway_settings()
-    forward_headers = _build_forward_headers(request.headers, request_id, asset_code)
+    forward_headers = _build_forward_headers(
+        request.headers,
+        request_id,
+        asset_code,
+        requires_personal_credential,
+    )
     status_code, success, resp_content, resp_content_type, error_msg = await _forward_request(
         target_url, body, forward_headers, settings.proxy_timeout_seconds
     )

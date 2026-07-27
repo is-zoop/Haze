@@ -148,6 +148,10 @@ function formatVersion(version: string): string {
 function mapCapability(item: ApiCapability): DeveloperAsset {
   const config = item.config ?? {};
   const packageInfo = item.package ?? undefined;
+  const mcpManifest = packageInfo?.manifest?.["mcp.json"];
+  const mcpManifestVersion = mcpManifest && typeof mcpManifest === "object" && !Array.isArray(mcpManifest)
+    ? (mcpManifest as Record<string, unknown>).version
+    : undefined;
   return {
     id: String(item.id),
     name: item.name,
@@ -178,6 +182,10 @@ function mapCapability(item: ApiCapability): DeveloperAsset {
     serverUrl: typeof config.serverUrl === "string" ? config.serverUrl : undefined,
     startCommand: typeof config.startCommand === "string" ? config.startCommand : undefined,
     startArgs: typeof config.startArgs === "string" ? config.startArgs : undefined,
+    mcpConfigVersion: typeof mcpManifestVersion === "string" || typeof mcpManifestVersion === "number"
+      ? String(mcpManifestVersion)
+      : undefined,
+    requiresPersonalCredential: config.requiresPersonalCredential === true,
     healthCheckUrl: typeof config.healthCheckUrl === "string" ? config.healthCheckUrl : undefined,
     credentialRef: typeof config.credentialRef === "string" ? config.credentialRef : undefined,
     averageResponseTime: typeof config.averageResponseTime === "number" ? config.averageResponseTime : undefined,
@@ -195,6 +203,7 @@ export function buildCapabilityConfig(asset: Partial<DeveloperAsset>): Record<st
       serverUrl: asset.serverUrl ?? "",
       startCommand: asset.startCommand ?? "",
       startArgs: asset.startArgs ?? "",
+      requiresPersonalCredential: asset.requiresPersonalCredential === true,
       healthCheckUrl: asset.healthCheckUrl ?? "",
       credentialRef: asset.credentialRef ?? "",
       averageResponseTime: asset.averageResponseTime,

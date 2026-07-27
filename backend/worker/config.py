@@ -23,7 +23,9 @@ class WorkerSettings(BaseSettings):
     k8s_in_cluster: bool = False          # True 时使用 Pod 内 ServiceAccount（生产）
     k8s_config_path: str | None = None   # kubeconfig 路径，None = 默认 ~/.kube/config
     k8s_verify_ssl: bool = True           # False 时跳过 TLS 证书校验（本地开发自签名证书场景）
-    k8s_proxy_base_url: str = ""          # 非空时用 kubectl proxy 格式构造 internal_url（Windows kind 开发环境）
+    k8s_proxy_base_url: str = ""          # 兼容 kubectl proxy 格式的开发环境地址
+    k8s_nodeport_base_url: str = ""       # 非空时用 NodePort 构造 internal_url（Docker 本地开发）
+    k8s_docker_network_cidr: str = ""     # 允许访问 MCP Pod 的 Docker Compose 网桥 CIDR
 
     # K8s 资源
     k8s_namespace: str = "haze-runtime"  # MCP Server namespace

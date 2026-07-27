@@ -12,6 +12,7 @@ from app.core.response import ApiResponse, success_response
 from app.core.config import get_settings
 from app.core.security import require_capabilities
 from app.db.session import get_db
+from app.modules.auth.router import _get_or_create_mcp_credential
 from app.modules.capabilities import service
 from app.modules.capabilities.models import Capability
 from app.modules.capabilities.test_runner import run_http_mcp_test, run_stdio_mcp_test
@@ -288,7 +289,21 @@ async def run_capability_test(
                 pkg = (capability.extension_json or {}).get("package", {})
                 zip_rel = pkg.get("path", "")
                 zip_abs = str(get_settings().local_storage_dir.resolve() / zip_rel) if zip_rel else ""
-                gen = run_http_mcp_test(server_url, capability.code, zip_abs)
+                config = (capability.extension_json or {}).get("config", {})
+                requires_personal_credential = (
+                    isinstance(config, dict)
+                    and config.get("requiresPersonalCredential") is True
+                )
+                authorization = None
+                if requires_personal_credential:
+                    credential = _get_or_create_mcp_credential(db, actor)
+                    authorization = f"Bearer {credential.key_raw}" if credential.key_raw else None
+                gen = run_http_mcp_test(
+                    server_url,
+                    capability.code,
+                    zip_abs,
+                    authorization=authorization,
+                )
 
             async for event in gen:
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"

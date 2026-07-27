@@ -57,7 +57,7 @@ def _get_or_create_mcp_credential(db: Session, user: User) -> UserMcpCredential:
     credential = db.scalar(select(UserMcpCredential).where(UserMcpCredential.user_id == user.id))
     if credential is not None:
         changed = False
-        if credential.key_prefix.startswith("haze_mcp_"):
+        if credential.key_prefix.startswith("haze_mcp_") or not credential.key_raw:
             key = _generate_mcp_key()
             credential.key_prefix = key[:18]
             credential.key_suffix = key[-4:]

@@ -84,10 +84,14 @@ async def run_http_mcp_test(
     server_url: str,
     capability_code: str,
     zip_path: str = "",
+    authorization: str | None = None,
 ) -> AsyncGenerator[dict, None]:
     """HTTP MCP 测试：6步流程，通过 async generator yield 事件。"""
     protocol_version = "unknown"
     mcp_url = server_url.rstrip("/")
+    mcp_headers = {"Accept": "application/json, text/event-stream"}
+    if authorization:
+        mcp_headers["Authorization"] = authorization
     init_body = _jsonrpc("initialize", {
         "protocolVersion": "2024-11-05",
         "capabilities": {},
@@ -103,7 +107,7 @@ async def run_http_mcp_test(
     t1 = t0
 
     try:
-        async with httpx.AsyncClient(verify=False, trust_env=False) as client:
+        async with httpx.AsyncClient(verify=False, trust_env=False, headers=mcp_headers) as client:
             async with client.stream("POST", mcp_url, json=init_body, timeout=5.0) as resp:
                 dur0 = int((time.monotonic() - t0) * 1000)
                 yield McpTestEvent.log("HTTP", f"连接成功 ({resp.status_code}) - {dur0}ms")
@@ -114,6 +118,9 @@ async def run_http_mcp_test(
                 yield McpTestEvent.step_start(1)
                 t1 = time.monotonic()
                 init_parsed = await _read_sse_or_json(resp)
+                session_id = resp.headers.get("mcp-session-id")
+                if session_id:
+                    mcp_headers["Mcp-Session-Id"] = session_id
     except Exception as exc:
         if not _connected:
             yield McpTestEvent.log("HTTP", f"连接失败: {exc}")
@@ -144,7 +151,7 @@ async def run_http_mcp_test(
     yield McpTestEvent.step_start(2)
     t2 = time.monotonic()
     try:
-        async with httpx.AsyncClient(verify=False, trust_env=False) as client:
+        async with httpx.AsyncClient(verify=False, trust_env=False, headers=mcp_headers) as client:
             async with client.stream(
                 "POST", mcp_url,
                 json=_jsonrpc_notify("notifications/initialized"),
@@ -164,7 +171,7 @@ async def run_http_mcp_test(
     t3 = time.monotonic()
     tools_discovered: list[dict] = []
     try:
-        async with httpx.AsyncClient(verify=False, trust_env=False) as client:
+        async with httpx.AsyncClient(verify=False, trust_env=False, headers=mcp_headers) as client:
             result = await _http_post(client, mcp_url, _jsonrpc("tools/list"))
         dur3 = int((time.monotonic() - t3) * 1000)
         tools_discovered = result.get("result", {}).get("tools", [])
@@ -195,7 +202,7 @@ async def run_http_mcp_test(
         t4 = time.monotonic()
         passed = 0
         try:
-            async with httpx.AsyncClient(verify=False, trust_env=False) as client:
+            async with httpx.AsyncClient(verify=False, trust_env=False, headers=mcp_headers) as client:
                 for case in test_cases:
                     tool_name = case.get("tool", "")
                     arguments = case.get("arguments", {})

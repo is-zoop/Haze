@@ -68,6 +68,11 @@ function formatDeployLogTime() {
   return new Date().toLocaleTimeString("zh-CN", { hour12: false });
 }
 
+function formatMcpLogTarget(target: string, version?: string) {
+  const normalizedVersion = version?.trim().replace(/^v/i, "");
+  return normalizedVersion ? `${target} v${normalizedVersion}` : target;
+}
+
 function deploymentStepIndex(deployment: McpDeployment | null, task: McpDeployTask | null, logs: string): number {
   if (task?.task_status === "success" || deployment?.deploy_status === "running") return 5;
   if (task?.task_status === "failed" || deployment?.deploy_status === "failed") return 5;
@@ -335,7 +340,8 @@ export function useDeveloperCapabilities(langCode: "ZH" | "EN" | "JA" | "ES") {
     try {
       const type = currentAsset.type === "MCP Server" ? "mcp" : "skill";
       const upload = await uploadCapabilityFile(file, type);
-      const mcpConfig = upload.manifest?.["mcp.json"] as Record<string, string> | undefined;
+      const mcpConfig = upload.manifest?.["mcp.json"] as Record<string, unknown> | undefined;
+      const mcpConfigVersion = mcpConfig?.version;
       setCurrentAsset((previous) => ({
         ...previous,
         packageUploadToken: upload.uploadToken,
@@ -343,10 +349,14 @@ export function useDeveloperCapabilities(langCode: "ZH" | "EN" | "JA" | "ES") {
         zipSize: formatFileSize(upload.size),
         zipFiles: upload.files.map((item) => ({ name: item.name, size: formatFileSize(item.size) })),
         ...(mcpConfig && previous.type === "MCP Server" ? {
-          transport: mcpConfig.transport?.toLowerCase() === "stdio" ? "STDIO" : "HTTP",
-          serverUrl: mcpConfig.serverUrl ?? previous.serverUrl,
-          startCommand: mcpConfig.command ?? previous.startCommand,
-          startArgs: mcpConfig.args ?? previous.startArgs,
+          transport: typeof mcpConfig.transport === "string" && mcpConfig.transport.toLowerCase() === "stdio" ? "STDIO" : "HTTP",
+          serverUrl: typeof mcpConfig.serverUrl === "string" ? mcpConfig.serverUrl : previous.serverUrl,
+          startCommand: typeof mcpConfig.command === "string" ? mcpConfig.command : previous.startCommand,
+          startArgs: typeof mcpConfig.args === "string" ? mcpConfig.args : previous.startArgs,
+          mcpConfigVersion: typeof mcpConfigVersion === "string" || typeof mcpConfigVersion === "number"
+            ? String(mcpConfigVersion)
+            : undefined,
+          requiresPersonalCredential: mcpConfig.requiresPersonalCredential === true,
         } : {}),
       }));
       setFormErrors((previous) => ({ ...previous, zipName: "" }));
@@ -456,7 +466,7 @@ export function useDeveloperCapabilities(langCode: "ZH" | "EN" | "JA" | "ES") {
     setDeployCurrentStepIndex(0);
     setDeployStepStatuses({});
     setDeployErrorMessage(null);
-    setDeployTerminalLogs([{ time: formatDeployLogTime(), type: "START", text: `创建 ${asset.name} 的服务部署任务...` }]);
+    setDeployTerminalLogs([{ time: formatDeployLogTime(), type: "START", text: `创建 ${formatMcpLogTarget(asset.name, asset.mcpConfigVersion)} 的服务部署任务...` }]);
 
     try {
       await deployCapability(asset.id);
@@ -609,7 +619,7 @@ export function useDeveloperCapabilities(langCode: "ZH" | "EN" | "JA" | "ES") {
       setTerminalLogs((prev) => [...prev, { time: formatTerminalTime(), type, text }]);
 
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
-    pushLog("START", `开始测试 MCP 服务: ${target.serverUrl || target.code}`);
+    pushLog("START", `开始测试 MCP 服务: ${formatMcpLogTarget(target.serverUrl || target.code, target.mcpConfigVersion)}`);
 
     try {
       const resp = await fetch(`/api/developer/capabilities/${target.id}/test-run`, {
