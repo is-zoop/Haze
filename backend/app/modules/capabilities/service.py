@@ -289,7 +289,7 @@ def create_capability(db: Session, actor: User, payload: CapabilityCreate) -> Ca
             created_paths.add(documentation_path)
             extension["documentation"] = documentation_meta
         if icon_upload:
-            suffix = Path(icon_upload["file_name"]).suffix.lower()
+            suffix = ".webp"
             icon_path, icon_meta = consume_upload(
                 icon_upload,
                 destination=Path("capabilities") / str(capability.id) / "icons" / f"{uuid4().hex}{suffix}",
@@ -425,7 +425,7 @@ def update_capability(
             old_icon = capability.icon
             if old_icon:
                 old_paths.add(old_icon)
-            suffix = Path(icon_upload["file_name"]).suffix.lower()
+            suffix = ".webp"
             icon_path, icon_meta = consume_upload(
                 icon_upload,
                 destination=Path("capabilities") / str(capability.id) / "icons" / f"{uuid4().hex}{suffix}",

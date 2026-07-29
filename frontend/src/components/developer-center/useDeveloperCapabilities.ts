@@ -12,7 +12,6 @@ import {
   type McpDeployment,
   formatFileSize,
   listCapabilities,
-  loadCapabilityIcon,
   offlineCapability,
   publishCapability,
   submitReviewCapability,
@@ -156,7 +155,6 @@ export function useDeveloperCapabilities(langCode: "ZH" | "EN" | "JA" | "ES") {
 
   const [deleteTarget, setDeleteTarget] = useState<DeveloperAsset | null>(null);
   const [flashMessage, setFlashMessage] = useState<FlashMessage | null>(null);
-  const iconUrlsRef = useRef<string[]>([]);
   const iconUploadPromiseRef = useRef<Promise<string | null> | null>(null);
   const requestIdRef = useRef(0);
 
@@ -177,21 +175,8 @@ export function useDeveloperCapabilities(langCode: "ZH" | "EN" | "JA" | "ES") {
           type,
           status: statusFilter === "all" ? undefined : statusFilter,
         });
-        const hydrated = await Promise.all(result.items.map(async (asset) => {
-          if (!asset.icon) return asset;
-          try {
-            return { ...asset, icon: await loadCapabilityIcon(asset.icon) };
-          } catch {
-            return { ...asset, icon: undefined };
-          }
-        }));
-        if (requestId !== requestIdRef.current) {
-          hydrated.forEach((asset) => asset.icon?.startsWith("blob:") && URL.revokeObjectURL(asset.icon));
-          return;
-        }
-        iconUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-        iconUrlsRef.current = hydrated.flatMap((asset) => asset.icon?.startsWith("blob:") ? [asset.icon] : []);
-        setAssets(hydrated);
+        if (requestId !== requestIdRef.current) return;
+        setAssets(result.items);
         setTotalItems(result.total);
         setCounts(result.counts);
       } catch (error) {
@@ -206,7 +191,6 @@ export function useDeveloperCapabilities(langCode: "ZH" | "EN" | "JA" | "ES") {
   }, [activeTypeTab, currentPage, pageSize, refreshVersion, searchQuery, statusFilter, triggerFlashAlert]);
 
   useEffect(() => () => {
-    iconUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     abortRef.current?.abort();
   }, []);
 

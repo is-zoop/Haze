@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { fetchHomeOverview, HomeCapabilityItem, HomeOverview } from "@/lib/home";
 import { getI18n } from "../../i18n";
+import { CapabilityIcon } from "@/components/common/CapabilityIcon";
 
 interface HomeProps {
   userName: string;
@@ -222,7 +223,13 @@ export function Home({
                           {/* Left: Icon container & Metadata details */}
                           <div className="flex items-start gap-3.5 flex-1 min-w-0">
                             <div className={`w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0 border ${item.iconColor || "bg-blue-50 text-blue-600 border-blue-100/50"}`}>
-                              {item.icon ? <img src={item.icon} alt="" className="h-11 w-11 rounded-lg object-cover" /> : <IconComp size={18} className="stroke-[2.2px]" />}
+                              <CapabilityIcon
+                                src={item.icon}
+                                version={item.updated_at}
+                                alt=""
+                                className="h-11 w-11 rounded-lg object-cover"
+                                fallback={<IconComp size={18} className="stroke-[2.2px]" />}
+                              />
                             </div>
                             <div className="space-y-1 min-w-0 flex-1">
                               {/* Title block with badges */}
@@ -293,5 +300,5 @@ function HomeMetric({ title, value, detail, icon, tone, onClick }: { title: stri
 }
 
 function HomeSideList({ title, items, emptyText, onView, usage = false }: { title: string; items: HomeCapabilityItem[]; emptyText: string; onView: () => void; usage?: boolean }) {
-  return <div className="flex min-h-0 flex-1 flex-col bg-white border border-slate-200/60 rounded-xl overflow-hidden text-left"><div className="p-4 border-b border-slate-100 flex items-center justify-between"><h3 className="text-sm font-bold text-slate-800">{title}</h3><button onClick={onView} className="text-xs text-blue-600 font-semibold">查看全部 &gt;</button></div>{items.length === 0 ? <div className="flex flex-1 items-center justify-center p-8 text-center text-xs text-slate-400">{emptyText}</div> : <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-auto">{items.map((item) => <div key={item.id} className="p-3 flex items-center gap-3"><div className={`w-9 h-9 rounded-lg flex items-center justify-center overflow-hidden ${item.type === "MCP" ? "bg-violet-50 text-violet-600" : "bg-blue-50 text-blue-600"}`}>{item.icon ? <img src={item.icon} alt="" className="h-9 w-9 object-cover" /> : item.type === "MCP" ? <Cpu size={16} /> : <Sparkles size={16} />}</div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-800 truncate">{item.name}</span><Badge variant="secondary" className="h-5 px-1.5 text-xs">{item.type}</Badge></div><p className="text-xs text-slate-400">{usage ? `使用 ${item.use_count ?? 0} 次` : `调用 ${item.calls} 次`}</p></div><Button variant="outline" size="sm" onClick={onView} className="h-7 px-2 text-xs">查看详情</Button></div>)}</div>}</div>;
+  return <div className="flex min-h-0 flex-1 flex-col bg-white border border-slate-200/60 rounded-xl overflow-hidden text-left"><div className="p-4 border-b border-slate-100 flex items-center justify-between"><h3 className="text-sm font-bold text-slate-800">{title}</h3><button onClick={onView} className="text-xs text-blue-600 font-semibold">查看全部 &gt;</button></div>{items.length === 0 ? <div className="flex flex-1 items-center justify-center p-8 text-center text-xs text-slate-400">{emptyText}</div> : <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-auto">{items.map((item) => <div key={item.id} className="p-3 flex items-center gap-3"><div className={`w-9 h-9 rounded-lg flex items-center justify-center overflow-hidden ${item.type === "MCP" ? "bg-violet-50 text-violet-600" : "bg-blue-50 text-blue-600"}`}><CapabilityIcon src={item.icon} version={item.updated_at} alt="" className="h-9 w-9 object-cover" fallback={item.type === "MCP" ? <Cpu size={16} /> : <Sparkles size={16} />} /></div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-800 truncate">{item.name}</span><Badge variant="secondary" className="h-5 px-1.5 text-xs">{item.type}</Badge></div><p className="text-xs text-slate-400">{usage ? `使用 ${item.use_count ?? 0} 次` : `调用 ${item.calls} 次`}</p></div><Button variant="outline" size="sm" onClick={onView} className="h-7 px-2 text-xs">查看详情</Button></div>)}</div>}</div>;
 }

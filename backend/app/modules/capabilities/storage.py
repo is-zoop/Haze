@@ -11,11 +11,15 @@ from uuid import uuid4
 from zipfile import BadZipFile, ZipFile
 
 from fastapi import UploadFile
+from PIL import Image, UnidentifiedImageError
 
 from app.core.config import get_settings
 from app.core.exceptions import AppException
 
 MAX_ICON_SIZE = 2 * 1024 * 1024
+MAX_ICON_DIMENSION = 128
+MAX_ICON_PIXELS = 16_000_000
+ICON_WEBP_QUALITY = 80
 MAX_PACKAGE_SIZE = 10 * 1024 * 1024
 MAX_ZIP_FILES = 500
 MAX_UNCOMPRESSED_SIZE = 50 * 1024 * 1024
@@ -59,6 +63,24 @@ def _validate_icon(data: bytes, file_name: str) -> None:
             _raise_upload("Invalid WebP image")
     elif not any(data.startswith(signature) for signature in ICON_SIGNATURES[suffix]):
         _raise_upload("Invalid image content")
+
+
+def optimize_icon(data: bytes, file_name: str) -> bytes:
+    """Validate and normalize a user icon without retaining the original image bytes."""
+    _validate_icon(data, file_name)
+    try:
+        with Image.open(BytesIO(data)) as image:
+            if image.width * image.height > MAX_ICON_PIXELS:
+                _raise_upload("Icon pixel dimensions exceed the allowed limit")
+            image.load()
+            has_alpha = image.mode in {"RGBA", "LA"} or "transparency" in image.info
+            normalized = image.convert("RGBA" if has_alpha else "RGB")
+            normalized.thumbnail((MAX_ICON_DIMENSION, MAX_ICON_DIMENSION), Image.Resampling.LANCZOS)
+            output = BytesIO()
+            normalized.save(output, format="WEBP", quality=ICON_WEBP_QUALITY, method=6)
+            return output.getvalue()
+    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, ValueError) as exc:
+        raise AppException(code=4005, message="Invalid image content", status_code=400) from exc
 
 
 def _safe_zip_path(name: str) -> PurePosixPath:
@@ -135,7 +157,8 @@ async def create_upload(
     files: list[dict[str, Any]] = []
     manifest = None
     if kind == "icon":
-        _validate_icon(data, file_name)
+        data = optimize_icon(data, file_name)
+        file_name = f"{Path(file_name).stem}.webp"
     else:
         if Path(file_name).suffix.lower() != ".zip":
             _raise_upload("Package must be a ZIP file")

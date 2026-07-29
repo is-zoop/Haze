@@ -40,6 +40,7 @@ import {
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { UnifiedTabs, TabItem } from "@/components/UnifiedTabs";
 import { PageHeader } from "../../components/common/PageHeader";
+import { CapabilityIcon } from "@/components/common/CapabilityIcon";
 import { DataTableFooter } from "../../components/common/DataTableFooter";
 import { StatusBadge } from "../../components/common/StatusBadge";
 import {
@@ -485,13 +486,12 @@ export function AuditCenter({ onBackToHome: _onBackToHome, langCode: _langCode =
                   <TableRow key={item.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        {item.icon ? (
-                          <img src={item.icon} alt="" className="size-9 rounded-lg object-cover shrink-0" />
-                        ) : (
-                          <div className={`size-9 rounded-lg shrink-0 flex items-center justify-center ${item.type === "Skill" ? "bg-blue-50 text-blue-600" : "bg-violet-50 text-violet-600"}`}>
-                            {item.type === "Skill" ? <Sparkles size={16} className="stroke-[2]" /> : <Cpu size={16} className="stroke-[2]" />}
-                          </div>
-                        )}
+                        <CapabilityIcon
+                          src={item.icon}
+                          alt=""
+                          className="size-9 rounded-lg object-cover shrink-0"
+                          fallback={<div className={`size-9 rounded-lg shrink-0 flex items-center justify-center ${item.type === "Skill" ? "bg-blue-50 text-blue-600" : "bg-violet-50 text-violet-600"}`}>{item.type === "Skill" ? <Sparkles size={16} className="stroke-[2]" /> : <Cpu size={16} className="stroke-[2]" />}</div>}
+                        />
                         <div className="flex flex-col gap-0.5 min-w-0">
                           <p className="font-semibold text-slate-900 leading-tight truncate">{item.name}</p>
                           <TableSecondaryText className="font-mono leading-none">{item.code}</TableSecondaryText>
@@ -573,13 +573,12 @@ export function AuditCenter({ onBackToHome: _onBackToHome, langCode: _langCode =
             {/* Header */}
             <div className="sticky top-0 z-10 p-5 border-b border-border/60 bg-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
-                {detail?.capability.icon ? (
-                  <img src={detail.capability.icon} alt="" className="size-9 rounded-lg object-cover shrink-0" />
-                ) : (
-                  <span className={`p-2 rounded-lg shrink-0 ${detail?.capability.type === "Skill" ? "bg-blue-50 text-blue-600" : "bg-violet-50 text-violet-600"}`}>
-                    {detail?.capability.type === "Skill" ? <Sparkles size={16} /> : <Cpu size={16} />}
-                  </span>
-                )}
+                <CapabilityIcon
+                  src={detail?.capability.icon}
+                  alt=""
+                  className="size-9 rounded-lg object-cover shrink-0"
+                  fallback={<span className={`p-2 rounded-lg shrink-0 ${detail?.capability.type === "Skill" ? "bg-blue-50 text-blue-600" : "bg-violet-50 text-violet-600"}`}>{detail?.capability.type === "Skill" ? <Sparkles size={16} /> : <Cpu size={16} />}</span>}
+                />
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 leading-tight">
                     {detail?.capability.name ?? selectedItem?.name ?? ""}

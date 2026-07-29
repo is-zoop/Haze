@@ -358,14 +358,7 @@ export async function deployCapability(id: string): Promise<void> {
 
 export async function listMcpDeployments(): Promise<McpDeployment[]> {
   const data = (await apiRequest<McpDeploymentListData>("/api/mcp-runtime/deployments?page=1&page_size=100")).data;
-  return Promise.all(data.items.map(async (item) => {
-    if (!item.capability_icon) return item;
-    try {
-      return { ...item, capability_icon: await loadCapabilityIcon(item.capability_icon) };
-    } catch {
-      return { ...item, capability_icon: null };
-    }
-  }));
+  return data.items;
 }
 
 export async function listMcpDeployTasks(deploymentId: number): Promise<McpDeployTask[]> {
@@ -398,10 +391,29 @@ export async function deleteCapability(id: string): Promise<void> {
   await apiRequest(`/api/developer/capabilities/${id}`, { method: "DELETE" });
 }
 
-export async function loadCapabilityIcon(path: string): Promise<string> {
-  const separator = path.includes("?") ? "&" : "?";
-  const blob = await apiBlobRequest(`${path}${separator}v=${Date.now()}`);
-  return URL.createObjectURL(blob);
+const ICON_BLOB_CACHE_LIMIT = 100;
+const capabilityIconBlobCache = new Map<string, Promise<Blob>>();
+
+/** Fetches authenticated icons once per path/version without delaying list APIs. */
+export function loadCapabilityIconBlob(path: string, version?: string): Promise<Blob> {
+  const cacheKey = `${path}::${version ?? ""}`;
+  const cached = capabilityIconBlobCache.get(cacheKey);
+  if (cached) {
+    capabilityIconBlobCache.delete(cacheKey);
+    capabilityIconBlobCache.set(cacheKey, cached);
+    return cached;
+  }
+
+  const request = apiBlobRequest(path).catch((error) => {
+    capabilityIconBlobCache.delete(cacheKey);
+    throw error;
+  });
+  capabilityIconBlobCache.set(cacheKey, request);
+  if (capabilityIconBlobCache.size > ICON_BLOB_CACHE_LIMIT) {
+    const oldestKey = capabilityIconBlobCache.keys().next().value as string | undefined;
+    if (oldestKey) capabilityIconBlobCache.delete(oldestKey);
+  }
+  return request;
 }
 
 export interface MarketCapabilityVersion {
@@ -447,15 +459,7 @@ export async function listMarketCapabilities(params: {
   if (params.categoryId) query.set("category_id", String(params.categoryId));
   if (params.favoriteOnly) query.set("favorite_only", "true");
   const data = (await apiRequest<{ items: MarketCapabilityItem[]; page: number; page_size: number; total: number }>(`/api/marketplace/capabilities?${query}`)).data;
-  const items = await Promise.all(data.items.map(async (item) => {
-    if (!item.icon) return item;
-    try {
-      return { ...item, icon: await loadCapabilityIcon(item.icon) };
-    } catch {
-      return { ...item, icon: null };
-    }
-  }));
-  return { items, total: data.total };
+  return { items: data.items, total: data.total };
 }
 
 export async function createMarketCapabilityDownloadLink(id: string): Promise<{ downloadUrl: string; expiresAt: string }> {

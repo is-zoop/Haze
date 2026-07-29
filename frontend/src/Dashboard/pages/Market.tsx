@@ -45,6 +45,7 @@ import {
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { UnifiedTabs, TabItem } from "@/components/UnifiedTabs";
 import { cn } from "@/lib/utils";
+import { CapabilityIcon } from "@/components/common/CapabilityIcon";
 import {
   Combobox,
   ComboboxContent,
@@ -740,9 +741,13 @@ export function Market({
                               "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg shadow-3xs overflow-hidden",
                               item.isMcp ? "bg-violet-50 text-violet-700" : "bg-blue-50 text-blue-700"
                             )}>
-                              {item.icon
-                                ? <img src={item.icon} alt={item.name} className="h-10 w-10 object-cover" />
-                                : item.isMcp ? <Cpu className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
+                              <CapabilityIcon
+                                src={item.icon}
+                                version={item.updateTime}
+                                alt={item.name}
+                                className="h-10 w-10 object-cover"
+                                fallback={item.isMcp ? <Cpu className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
+                              />
                             </span>
                             <div className="min-w-0">
                               <h4 className="truncate text-sm font-extrabold text-slate-800">{display.name}</h4>
@@ -966,13 +971,13 @@ function CapabilitySheet({
             "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
             item.isMcp ? "bg-violet-50 text-violet-700" : "bg-blue-50 text-blue-700",
           )}>
-            {item.icon ? (
-              <img src={item.icon} alt="" className="h-full w-full rounded-lg object-cover" />
-            ) : item.isMcp ? (
-              <Cpu className="h-5 w-5" />
-            ) : (
-              <Sparkles className="h-5 w-5" />
-            )}
+            <CapabilityIcon
+              src={item.icon}
+              version={item.updateTime}
+              alt=""
+              className="h-full w-full rounded-lg object-cover"
+              fallback={item.isMcp ? <Cpu className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
+            />
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">

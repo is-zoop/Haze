@@ -1,5 +1,4 @@
 import { apiRequest } from "./api";
-import { loadCapabilityIcon } from "./capabilities";
 
 export interface AuditStats {
   pending: number;
@@ -91,28 +90,11 @@ export async function fetchAuditCapabilities(params: {
     `/api/audit/capabilities?${query}`
   )).data;
 
-  const items = await Promise.all(data.items.map(async (item) => {
-    if (!item.icon) return item;
-    try {
-      return { ...item, icon: await loadCapabilityIcon(item.icon) };
-    } catch {
-      return { ...item, icon: null };
-    }
-  }));
-
-  return { items, total: data.total };
+  return { items: data.items, total: data.total };
 }
 
 export async function fetchAuditDetail(id: string): Promise<AuditDetail> {
-  const raw = (await apiRequest<AuditDetail>(`/api/audit/capabilities/${id}/detail`)).data;
-  if (raw.capability.icon) {
-    try {
-      raw.capability.icon = await loadCapabilityIcon(raw.capability.icon);
-    } catch {
-      raw.capability.icon = null;
-    }
-  }
-  return raw;
+  return (await apiRequest<AuditDetail>(`/api/audit/capabilities/${id}/detail`)).data;
 }
 
 export async function reviewCapability(

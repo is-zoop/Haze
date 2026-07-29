@@ -1,5 +1,4 @@
 import { apiRequest } from "./api";
-import { loadCapabilityIcon } from "./capabilities";
 
 export interface HomeCapabilityItem {
   id: string;
@@ -30,20 +29,7 @@ export interface HomeOverview {
 }
 
 export async function fetchHomeOverview(): Promise<HomeOverview> {
-  const overview = (await apiRequest<HomeOverview>("/api/home/overview")).data;
-  const iconCache = new Map<string, Promise<string | null>>();
-  const hydrate = (items: HomeCapabilityItem[]) => Promise.all(items.map(async (item) => {
-    if (!item.icon) return item;
-    if (!iconCache.has(item.icon)) {
-      iconCache.set(item.icon, loadCapabilityIcon(item.icon).catch(() => null));
-    }
-    return { ...item, icon: await iconCache.get(item.icon) ?? null };
-  }));
-  const [recommended, latest, popular, favorites, frequent] = await Promise.all([
-    hydrate(overview.recommended), hydrate(overview.latest), hydrate(overview.popular),
-    hydrate(overview.favorites), hydrate(overview.frequent),
-  ]);
-  return { ...overview, recommended, latest, popular, favorites, frequent };
+  return (await apiRequest<HomeOverview>("/api/home/overview")).data;
 }
 
 export async function recordHomeCapabilityUsage(id: string): Promise<void> {

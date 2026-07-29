@@ -148,7 +148,7 @@ def get_capability_icon(
     actor: Annotated[User, Depends(require_capabilities("capabilities.read"))],
 ) -> FileResponse:
     path = service.get_capability_icon(db, capability_id, actor)
-    return FileResponse(path)
+    return FileResponse(path, headers={"Cache-Control": "private, max-age=86400"})
 
 
 @router.patch("/capabilities/{capability_id}", response_model=ApiResponse[CapabilityData])

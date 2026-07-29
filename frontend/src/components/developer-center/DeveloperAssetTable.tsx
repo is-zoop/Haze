@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DeveloperAsset } from "../../types/developer-center";
 import { StatusBadge } from "../common/StatusBadge";
+import { CapabilityIcon } from "../common/CapabilityIcon";
 import { getI18n } from "../../i18n";
 
 const tableStatusClassName = "flex items-center gap-1.5 text-xs font-semibold";
@@ -207,14 +208,15 @@ export function DeveloperAssetTable({
   };
 
   // Helper to get styled asset icon
-  const getAssetIcon = (code: string, type: "Skill" | "MCP Server" | string, customIcon?: string) => {
+  const getAssetIcon = (code: string, type: "Skill" | "MCP Server" | string, customIcon?: string, updatedAt?: string) => {
     if (customIcon) {
       return (
-        <img
+        <CapabilityIcon
           src={customIcon}
+          version={updatedAt}
           alt="Icon"
-          referrerPolicy="no-referrer"
           className="h-10 w-10 shrink-0 rounded-lg object-cover border border-slate-200 shadow-xs"
+          fallback={<div className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center border shadow-xs ${type === "Skill" ? "bg-blue-50 text-blue-600 border-blue-100/50" : "bg-violet-50 text-violet-600 border-violet-100/50"}`}>{type === "Skill" ? <Sparkles size={18} /> : <Cpu size={18} />}</div>}
         />
       );
     }
@@ -298,7 +300,7 @@ export function DeveloperAssetTable({
                   <TableRow key={asset.id}>
                     <TableCell className="w-[240px] text-left">
                       <div className="flex items-center gap-3 text-left">
-                        {getAssetIcon(asset.code, asset.type, asset.icon)}
+                        {getAssetIcon(asset.code, asset.type, asset.icon, asset.updatedAt)}
                         <div className="space-y-0.5 text-left">
                           <p className="font-semibold text-foreground text-left">{asset.name}</p>
                           <TableSecondaryText className="flex items-center gap-1 text-left">

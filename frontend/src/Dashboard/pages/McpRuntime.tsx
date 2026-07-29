@@ -16,6 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { EmptyState } from "@/components/common/EmptyState";
 import { PageHeader } from "@/components/common/PageHeader";
+import { CapabilityIcon } from "@/components/common/CapabilityIcon";
 import { DataTableFooter } from "@/components/common/DataTableFooter";
 import { getI18n } from "@/i18n";
 import {
@@ -268,17 +269,13 @@ export function McpRuntime({ langCode = "ZH" }: PageProps) {
                           <TableRow key={dep.id}>
                             <TableCell>
                               <div className="flex items-center gap-3">
-                                {dep.capability_icon ? (
-                                  <img
-                                    src={dep.capability_icon}
-                                    alt={dep.capability_name ?? dep.deployment_name}
-                                    className="h-10 w-10 shrink-0 rounded-lg border border-slate-200 object-cover shadow-xs"
-                                  />
-                                ) : (
-                                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-600 shadow-xs">
-                                    <Cpu size={18} />
-                                  </div>
-                                )}
+                                <CapabilityIcon
+                                  src={dep.capability_icon}
+                                  version={dep.updated_at}
+                                  alt={dep.capability_name ?? dep.deployment_name}
+                                  className="h-10 w-10 shrink-0 rounded-lg border border-slate-200 object-cover shadow-xs"
+                                  fallback={<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-600 shadow-xs"><Cpu size={18} /></div>}
+                                />
                                 <div className="min-w-0">
                                   <div className="font-semibold text-foreground leading-tight">
                                     {dep.capability_name ?? dep.deployment_name}

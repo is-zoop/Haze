@@ -133,7 +133,7 @@ def get_market_capability_icon(
     capability = _get_published_capability(db, capability_id)
     if not capability.icon:
         raise AppException(code=4045, message="Capability icon not found", status_code=404)
-    return FileResponse(resolve_stored_file(capability.icon))
+    return FileResponse(resolve_stored_file(capability.icon), headers={"Cache-Control": "private, max-age=86400"})
 
 
 def _create_download_link(db: Session, capability: Capability, actor: User) -> DownloadLinkData:
