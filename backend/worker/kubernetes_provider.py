@@ -164,10 +164,9 @@ class KubernetesRuntimeProvider:
                             kubernetes.client.V1Container(
                                 name="mcp-server",
                                 image=image,
-                                # IfNotPresent：本地有镜像时直接使用，不再拉取
-                                # Docker Desktop K8s 共享宿主机镜像存储，build 后无需 push 即可用
-                                # 生产环境（in-cluster）同样适用，镜像由 Worker push 后首次拉取会缓存
-                                image_pull_policy="IfNotPresent",
+                                # 草稿 HTTP MCP 可覆盖上传 ZIP，但同一版本会复用镜像标签。
+                                # 强制拉取可避免节点命中旧缓存而运行过期代码。
+                                image_pull_policy="Always",
                                 ports=[kubernetes.client.V1ContainerPort(container_port=port)],
                                 resources=kubernetes.client.V1ResourceRequirements(
                                     requests={
@@ -261,6 +260,15 @@ class KubernetesRuntimeProvider:
                     )
                 ],
                 egress=[
+                    # Haze 宿主机 MySQL（天猫 Cookie 查询）
+                    kubernetes.client.V1NetworkPolicyEgressRule(
+                        to=[
+                            kubernetes.client.V1NetworkPolicyPeer(
+                                ip_block=kubernetes.client.V1IPBlock(cidr="192.168.40.132/32")
+                            )
+                        ],
+                        ports=[kubernetes.client.V1NetworkPolicyPort(port=3306, protocol="TCP")],
+                    ),
                     # DNS（UDP/TCP 53）
                     kubernetes.client.V1NetworkPolicyEgressRule(
                         ports=[

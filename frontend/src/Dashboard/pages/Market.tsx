@@ -824,8 +824,14 @@ export function Market({
                                     <button className="flex h-6 w-6 shrink-0 items-center justify-center text-slate-400 transition-colors hover:text-amber-500" onClick={() => toggleFavorite(item.id, item.isMcp)} aria-label={item.isFavorite ? "取消收藏" : "收藏"}>
                                       <Star className={cn("h-3.5 w-3.5", item.isFavorite && "fill-amber-400 text-amber-500")} />
                                     </button>
-                                    <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-md", item.isMcp ? "bg-violet-50 text-violet-700" : "bg-blue-50 text-blue-700")}>
-                                      {item.isMcp ? <Cpu className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+                                    <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md", item.isMcp ? "bg-violet-50 text-violet-700" : "bg-blue-50 text-blue-700")}>
+                                      <CapabilityIcon
+                                        src={item.icon}
+                                        version={item.updateTime}
+                                        alt={item.name}
+                                        className="h-7 w-7 object-cover"
+                                        fallback={item.isMcp ? <Cpu className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+                                      />
                                     </span>
                                     <span className="max-w-[160px] truncate text-xs font-semibold text-slate-800" title={display.name}>{display.name}</span>
                                   </div>
