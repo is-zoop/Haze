@@ -1,4 +1,4 @@
-name: ${COMPOSE_PROJECT_NAME:-haze}
+name: haze
 
 services:
   storage-init:
@@ -15,11 +15,11 @@ services:
     image: registry:2.8
     restart: unless-stopped
     environment:
-      REGISTRY_HTTP_ADDR: ${REGISTRY_HTTP_ADDR:-0.0.0.0:5000}
-      REGISTRY_STORAGE_DELETE_ENABLED: ${REGISTRY_STORAGE_DELETE_ENABLED:-true}
-      REGISTRY_HTTP_RELATIVEURLS: ${REGISTRY_HTTP_RELATIVEURLS:-true}
+      REGISTRY_HTTP_ADDR: "0.0.0.0:5000"
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+      REGISTRY_HTTP_RELATIVEURLS: "true"
     ports:
-      - "${REGISTRY_PORT:-5000}:5000"
+      - "5000:5000"
     volumes:
       - type: bind
         source: ${HAZE_REGISTRY_PATH:-./data/registry}
@@ -32,32 +32,28 @@ services:
     image: haze-backend:${HAZE_VERSION:-latest}
     restart: unless-stopped
     user: "${PUID:-1000}:${PGID:-1000}"
-    env_file:
-      - .env
     environment:
-      ENVIRONMENT: ${ENVIRONMENT:-production}
-      DEBUG: ${DEBUG:-false}
-      DATABASE_URL: ${DATABASE_URL}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
-      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-60}
-      INITIAL_ADMIN_NAME: ${INITIAL_ADMIN_NAME:-admin}
-      INITIAL_ADMIN_PHONE: ${INITIAL_ADMIN_PHONE}
-      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL}
-      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD}
-      INITIAL_ADMIN_DEPARTMENT: ${INITIAL_ADMIN_DEPARTMENT:-System Administration}
-      CORS_ORIGINS: ${CORS_ORIGINS}
-      LOCAL_STORAGE_DIR: ${LOCAL_STORAGE_DIR:-/app/storage}
-      DOWNLOAD_PUBLIC_BASE_URL: ${DOWNLOAD_PUBLIC_BASE_URL:-http://127.0.0.1:8000}
-      DOWNLOAD_LINK_EXPIRE_MINUTES: ${DOWNLOAD_LINK_EXPIRE_MINUTES:-30}
-      GATEWAY_PUBLIC_BASE_URL: ${GATEWAY_PUBLIC_BASE_URL:-http://127.0.0.1:8001}
-      MCP_DOCKER_PREPULL: ${MCP_DOCKER_PREPULL:-false}
-      MCP_DOCKER_IMAGES: ${MCP_DOCKER_IMAGES:-["node:20-slim","python:3.12-slim"]}
-      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      ENVIRONMENT: production
+      DEBUG: "false"
+      DATABASE_URL: "mysql+pymysql://admin:Power1602!@host.docker.internal:3306/Haze?charset=utf8mb4"
+      JWT_SECRET_KEY: "SxxPkeg-XZgee7V0RA3Hh5VkJwzqh3bzyqEyWu4KDII"
+      INITIAL_ADMIN_NAME: "admin"
+      INITIAL_ADMIN_PHONE: "18158183710"
+      INITIAL_ADMIN_EMAIL: "zoop6454@gmail.com"
+      INITIAL_ADMIN_PASSWORD: "power1602"
+      INITIAL_ADMIN_DEPARTMENT: "系统"
+      CORS_ORIGINS: '["https://skill.paiwo188.com"]'
+      LOCAL_STORAGE_DIR: /app/storage
+      DOWNLOAD_PUBLIC_BASE_URL: "https://skill.paiwo188.com"
+      GATEWAY_PUBLIC_BASE_URL: "https://mcp.paiwo188.com"
+      MCP_DOCKER_PREPULL: "false"
+      WEB_CONCURRENCY: "2"
+      KUBECONFIG: /app/kubeconfig
     volumes:
       - type: bind
         source: ${HAZE_STORAGE_PATH:-./data/storage}
         target: /app/storage
+      - ./haze-backend.kubeconfig:/app/kubeconfig:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -77,15 +73,12 @@ services:
     restart: unless-stopped
     user: "${PUID:-1000}:${PGID:-1000}"
     command: ["python", "-m", "gateway.main"]
-    env_file:
-      - .env
     environment:
-      ENVIRONMENT: ${ENVIRONMENT:-production}
-      DATABASE_URL: ${DATABASE_URL}
-      GATEWAY_HOST: ${GATEWAY_HOST:-0.0.0.0}
-      GATEWAY_PORT: ${GATEWAY_PORT:-8001}
-      PROXY_TIMEOUT_SECONDS: ${PROXY_TIMEOUT_SECONDS:-30}
-      TRUSTED_MCP_CREDENTIAL_PASSTHROUGH: ${TRUSTED_MCP_CREDENTIAL_PASSTHROUGH:-marketplace-query}
+      ENVIRONMENT: production
+      DATABASE_URL: "mysql+pymysql://admin:Power1602!@host.docker.internal:3306/Haze?charset=utf8mb4"
+      GATEWAY_HOST: 0.0.0.0
+      GATEWAY_PORT: 8001
+      TRUSTED_MCP_CREDENTIAL_PASSTHROUGH: "marketplace-query"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -99,33 +92,21 @@ services:
     restart: unless-stopped
     user: "0:0"
     command: ["python", "-m", "worker.main"]
-    env_file:
-      - .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      ENVIRONMENT: ${ENVIRONMENT:-production}
-      DATABASE_URL: ${DATABASE_URL}
-      LOCAL_STORAGE_DIR: ${LOCAL_STORAGE_DIR:-/app/storage}
-      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-5}
-      TASK_LOCK_TIMEOUT_SECONDS: ${TASK_LOCK_TIMEOUT_SECONDS:-300}
-      K8S_IN_CLUSTER: ${K8S_IN_CLUSTER:-false}
-      K8S_CONFIG_PATH: ${K8S_CONFIG_PATH:-/run/haze/kubeconfig}
-      K8S_VERIFY_SSL: ${K8S_VERIFY_SSL:-true}
-      K8S_PROXY_BASE_URL: ${K8S_PROXY_BASE_URL:-http://host.docker.internal:8090}
-      K8S_NAMESPACE: ${K8S_NAMESPACE:-haze-runtime}
-      GATEWAY_PUBLIC_BASE_URL: ${GATEWAY_PUBLIC_BASE_URL:-http://127.0.0.1:8001}
-      MCP_PLACEHOLDER_IMAGE: ${MCP_PLACEHOLDER_IMAGE:-node:20-slim}
-      POD_READY_TIMEOUT_SECONDS: ${POD_READY_TIMEOUT_SECONDS:-120}
-      POD_READY_POLL_SECONDS: ${POD_READY_POLL_SECONDS:-5}
-      MCP_CPU_REQUEST: ${MCP_CPU_REQUEST:-100m}
-      MCP_CPU_LIMIT: ${MCP_CPU_LIMIT:-500m}
-      MCP_MEMORY_REQUEST: ${MCP_MEMORY_REQUEST:-128Mi}
-      MCP_MEMORY_LIMIT: ${MCP_MEMORY_LIMIT:-512Mi}
-      REGISTRY_URL: ${REGISTRY_URL:-localhost:5000}
-      REGISTRY_PROJECT: ${REGISTRY_PROJECT:-haze-mcp}
-      REGISTRY_PUSH_ENABLED: ${REGISTRY_PUSH_ENABLED:-true}
-      DOCKER_BUILD_TIMEOUT_SECONDS: ${DOCKER_BUILD_TIMEOUT_SECONDS:-300}
+      ENVIRONMENT: production
+      DATABASE_URL: "mysql+pymysql://admin:Power1602!@host.docker.internal:3306/Haze?charset=utf8mb4"
+      LOCAL_STORAGE_DIR: /app/storage
+      K8S_IN_CLUSTER: "false"
+      K8S_CONFIG_PATH: /run/haze/kubeconfig
+      K8S_NAMESPACE: "haze-runtime"
+      K8S_NODEPORT_BASE_URL: "http://192.168.40.132"
+      K8S_DOCKER_NETWORK_CIDR: "172.23.0.0/16"
+      GATEWAY_PUBLIC_BASE_URL: "https://mcp.paiwo188.com"
+      REGISTRY_URL: "regskill.paiwo188.com"
+      REGISTRY_PROJECT: "haze-mcp"
+      REGISTRY_PUSH_ENABLED: "true"
       DOCKER_CONFIG: /root/.docker
       BUILDX_CONFIG: /tmp/buildx
     volumes:
@@ -133,10 +114,10 @@ services:
         source: ${HAZE_STORAGE_PATH:-./data/storage}
         target: /app/storage
       - type: bind
-        source: ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}
+        source: /var/run/docker.sock
         target: /var/run/docker.sock
       - type: bind
-        source: ${K8S_CONFIG_HOST_PATH:-/home/paiwo/.kube/config}
+        source: /home/paiwo/.kube/config
         target: /run/haze/kubeconfig
         read_only: true
       - type: bind
@@ -156,11 +137,11 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+        VITE_API_BASE_URL: ""
     image: haze-frontend:${HAZE_VERSION:-latest}
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-8080}:80"
+      - "8080:80"
     depends_on:
       backend:
         condition: service_healthy

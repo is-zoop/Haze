@@ -24,6 +24,9 @@ interface McpConnectionTestDialogProps {
   onStartTest: () => void;
   onClearLogs: () => void;
   onTriggerAlert: (msg: string) => void;
+  onExportLogs: () => void;
+  exportLabel: string;
+  exportDisabled: boolean;
   steps?: { name: string; desc: string }[];
 }
 
@@ -41,13 +44,20 @@ export function McpConnectionTestDialog({
   onStartTest,
   onClearLogs,
   onTriggerAlert,
+  onExportLogs,
+  exportLabel,
+  exportDisabled,
   steps,
 }: McpConnectionTestDialogProps) {
   if (!debugAsset) return null;
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="flex h-[580px] w-full max-w-4xl flex-col gap-0 rounded-xl border-slate-200 bg-white p-5 shadow-xl">
+      <DialogContent
+        onPointerDownOutside={(event) => event.preventDefault()}
+        onEscapeKeyDown={(event) => event.preventDefault()}
+        className="flex h-[580px] w-full max-w-4xl flex-col gap-0 rounded-xl border-slate-200 bg-white p-5 shadow-xl"
+      >
         <DialogHeader className="shrink-0 border-b border-slate-100 pb-3 pr-10">
           <DialogTitle className="flex items-center gap-2 text-left text-sm font-bold text-slate-800">
             <Terminal size={14} className="text-blue-500" />
@@ -70,6 +80,9 @@ export function McpConnectionTestDialog({
             langCode={langCode}
             onClearLogs={onClearLogs}
             onTriggerAlert={onTriggerAlert}
+            onExportLogs={onExportLogs}
+            exportLabel={exportLabel}
+            exportDisabled={exportDisabled}
           />
         </div>
 

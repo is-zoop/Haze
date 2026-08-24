@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
 import { LanguageDropdown, Language } from "./components/LanguageDropdown";
 import { LoginForm } from "./components/LoginForm";
 import { LandscapePanel } from "./components/LandscapePanel";
@@ -73,14 +72,8 @@ export default function App() {
       <DotScannerBackground />
 
       <div className={`w-full relative z-10 ${currentUser ? "max-w-full h-screen" : "max-w-5xl"}`}>
-        <AnimatePresence mode="wait">
           {!currentUser ? (
-            <motion.div
-              key="auth-card"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            <div
               className="w-full bg-white rounded-[2rem] shadow-xl border border-neutral-200/60 overflow-hidden grid grid-cols-1 md:grid-cols-2 min-h-[580px]"
             >
               {/* Left Column (Forms) */}
@@ -109,19 +102,12 @@ export default function App() {
               <div className="hidden md:block border-l border-neutral-100">
                 <LandscapePanel />
               </div>
-            </motion.div>
+            </div>
           ) : (
-            <motion.div
-              key="dashboard-view"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.4, ease: "easeOut" }}
-            >
+            <div>
               <Dashboard user={currentUser} onLogout={handleLogout} currentLang={currentLang} />
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
       </div>
     </div>
   );

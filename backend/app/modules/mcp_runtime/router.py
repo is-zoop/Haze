@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -14,6 +15,7 @@ from app.modules.mcp_runtime.schemas import (
     McpCallLogListData,
     McpDeploymentData,
     McpDeploymentListData,
+    McpRuntimeCapabilityOptionListData,
     McpDeployTaskListData,
     McpTaskCreated,
 )
@@ -36,6 +38,59 @@ def list_deployments(
         service.list_deployments(db, actor, page=page, page_size=page_size),
     )
 
+
+@router.get("/capabilities", response_model=ApiResponse[McpRuntimeCapabilityOptionListData])
+def list_filter_capabilities(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    actor: Annotated[User, Depends(require_capabilities("mcp_runtime.read"))],
+) -> ApiResponse[McpRuntimeCapabilityOptionListData]:
+    """查询运行监控筛选可用的 MCP 能力。"""
+    return success_response(request, service.list_filter_capabilities(db, actor))
+
+@router.get("/tasks", response_model=ApiResponse[McpDeployTaskListData])
+def list_all_tasks(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    actor: Annotated[User, Depends(require_capabilities("mcp_runtime.read"))],
+    capability_name: str | None = Query(default=None, max_length=100),
+    capability_ids: list[int] | None = Query(default=None),
+    start_at: date | None = Query(default=None),
+    end_at: date | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+) -> ApiResponse[McpDeployTaskListData]:
+    """跨能力查询部署任务记录。"""
+    return success_response(
+        request,
+        service.list_all_tasks(
+            db, actor, capability_name=capability_name, capability_ids=capability_ids, start_at=start_at,
+            end_at=end_at, page=page, page_size=page_size,
+        ),
+    )
+
+
+@router.get("/calls", response_model=ApiResponse[McpCallLogListData])
+def list_all_calls(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    actor: Annotated[User, Depends(require_capabilities("mcp_runtime.read"))],
+    capability_name: str | None = Query(default=None, max_length=100),
+    capability_ids: list[int] | None = Query(default=None),
+    start_at: date | None = Query(default=None),
+    end_at: date | None = Query(default=None),
+    methods: list[str] | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+) -> ApiResponse[McpCallLogListData]:
+    """跨能力查询 Gateway 调用记录。"""
+    return success_response(
+        request,
+        service.list_all_calls(
+            db, actor, capability_name=capability_name, capability_ids=capability_ids, start_at=start_at,
+            end_at=end_at, methods=methods, page=page, page_size=page_size,
+        ),
+    )
 
 @router.get("/deployments/{deployment_id}", response_model=ApiResponse[McpDeploymentData])
 def get_deployment(
@@ -73,6 +128,19 @@ def get_logs(
     """获取部署实例最新任务的执行日志，返回纯文本。"""
     return service.get_logs(db, deployment_id, actor)
 
+
+@router.get("/deployments/{deployment_id}/debug-log", response_class=PlainTextResponse)
+def download_debug_log(
+    deployment_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    actor: Annotated[User, Depends(require_capabilities("mcp_runtime.read"))],
+) -> PlainTextResponse:
+    """下载最新部署任务的脱敏调试日志。"""
+    content = service.get_debug_log(db, deployment_id, actor)
+    return PlainTextResponse(
+        content,
+        headers={"Content-Disposition": f'attachment; filename="mcp-deployment-{deployment_id}-debug.txt"'},
+    )
 
 @router.get("/deployments/{deployment_id}/calls", response_model=ApiResponse[McpCallLogListData])
 def list_calls(

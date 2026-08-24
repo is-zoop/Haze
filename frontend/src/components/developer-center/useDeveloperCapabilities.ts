@@ -6,6 +6,8 @@ import {
   deleteCapability,
   deployCapability,
   getMcpDeploymentLogs,
+  getMcpDeploymentDebugLog,
+  getCapabilityTestDebugLog,
   listMcpDeployments,
   listMcpDeployTasks,
   type McpDeployTask,
@@ -92,22 +94,42 @@ function deploymentStepStatuses(deployment: McpDeployment | null, task: McpDeplo
 }
 
 function deploymentLogsToTerminal(logs: string, task: McpDeployTask | null): Array<{ time: string; type: string; text: string }> {
-  const lines = logs.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const lines = logs.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith("[DETAIL]"));
   const time = formatDeployLogTime();
-  const terminal = lines.map((line) => ({
-    time,
-    type: line.includes("镜像") ? "BUILD" : line.includes("K8s") ? "K8S" : line.includes("Pod") ? "READY" : line.includes("Gateway") ? "ROUTE" : line.includes("成功") ? "SUCCESS" : "DEPLOY",
-    text: line,
-  }));
-  if (task?.error_message) terminal.push({ time, type: "ERROR", text: task.error_message });
+  const terminal = lines.map((line) => {
+    const summary = line.replace(/^\[SUMMARY\]\s*/, "");
+    const tagged = summary.match(/^\[([A-Z]+)\]\s*(.*)$/);
+    return {
+      time,
+      type: tagged?.[1] ?? (summary.includes("镜像") ? "BUILD" : summary.includes("K8s") ? "K8S" : summary.includes("Pod") ? "READY" : summary.includes("Gateway") ? "ROUTE" : summary.includes("成功") ? "SUCCESS" : "DEPLOY"),
+      text: tagged?.[2] || summary,
+    };
+  });
+  if (task?.error_message && !logs.includes("[SUMMARY]")) terminal.push({ time, type: "ERROR", text: task.error_message });
   if (!terminal.length) terminal.push({ time, type: "DEPLOY", text: "等待部署任务写入日志..." });
   return terminal;
+}
+
+function deploymentErrorSummary(logs: string, task: McpDeployTask | null, deployment: McpDeployment | null): string | null {
+  const summary = logs.split(/\r?\n/).find((line) => line.startsWith("[SUMMARY]"));
+  if (summary) return summary.replace(/^\[SUMMARY\]\s*(?:\[[A-Z]+\]\s*)?/, "");
+  return task?.error_message ?? deployment?.last_error ?? null;
+}
+
+function downloadDebugLog(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 export function useDeveloperCapabilities(langCode: "ZH" | "EN" | "JA" | "ES") {
   const t = getI18n(langCode);
   const formatAlert = (template: string, values: Record<string, string>) =>
     Object.entries(values).reduce((message, [key, value]) => message.replace(`{${key}}`, value), template);
   const [assets, setAssets] = useState<DeveloperAsset[]>([]);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [counts, setCounts] = useState<Record<string, number>>({ all: 0, skill: 0, mcp: 0 });
   const [totalItems, setTotalItems] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
@@ -179,11 +201,13 @@ export function useDeveloperCapabilities(langCode: "ZH" | "EN" | "JA" | "ES") {
         setAssets(result.items);
         setTotalItems(result.total);
         setCounts(result.counts);
+        setIsInitialLoading(false);
       } catch (error) {
         if (requestId === requestIdRef.current) {
           setAssets([]);
           setTotalItems(0);
           triggerFlashAlert({ type: "error", title: t.alertLoadFailedTitle, description: errorMessage(error) });
+          setIsInitialLoading(false);
         }
       }
     }, 250);
@@ -217,7 +241,7 @@ export function useDeveloperCapabilities(langCode: "ZH" | "EN" | "JA" | "ES") {
         setDeployCurrentStepIndex(currentStep);
         setDeployStepStatuses(deploymentStepStatuses(deployment, latestTask, currentStep));
         setDeployTerminalLogs(deploymentLogsToTerminal(logs, latestTask));
-        setDeployErrorMessage(latestTask?.error_message ?? deployment?.last_error ?? null);
+        setDeployErrorMessage(deploymentErrorSummary(logs, latestTask, deployment));
         setDeployStatus(nextStatus);
         if (nextStatus === "success") refresh();
       } catch (error) {
@@ -440,11 +464,22 @@ export function useDeveloperCapabilities(langCode: "ZH" | "EN" | "JA" | "ES") {
     }
   };
 
-  const handleDeployAsset = async (asset: DeveloperAsset) => {
-    const sessionId = deploySessionRef.current + 1;
-    deploySessionRef.current = sessionId;
+  const handleDeployAsset = (asset: DeveloperAsset) => {
     setDeployAsset(asset);
     setShowDeployModal(true);
+    setDeployStatus("idle");
+    setDeployDeploymentId(null);
+    setDeployCurrentStepIndex(-1);
+    setDeployStepStatuses({});
+    setDeployErrorMessage(null);
+    setDeployTerminalLogs([]);
+  };
+
+  const startDeployAsset = async () => {
+    if (!deployAsset) return;
+    const asset = deployAsset;
+    const sessionId = deploySessionRef.current + 1;
+    deploySessionRef.current = sessionId;
     setDeployStatus("creating");
     setDeployDeploymentId(null);
     setDeployCurrentStepIndex(0);
@@ -670,6 +705,43 @@ export function useDeveloperCapabilities(langCode: "ZH" | "EN" | "JA" | "ES") {
     }
   };
 
+  const exportDeploymentDebugLog = async () => {
+    if (deployDeploymentId === null) return;
+    try {
+      const blob = await getMcpDeploymentDebugLog(deployDeploymentId);
+      downloadDebugLog(blob, `mcp-deployment-${deployDeploymentId}-debug.txt`);
+      triggerFlashAlert({ type: "success", title: t.alertCopySuccessTitle, description: t.developerDebugLogExported });
+    } catch (error) {
+      triggerFlashAlert({ type: "error", title: t.auditActionFailed, description: `${t.developerDebugLogExportFailed}: ${errorMessage(error)}` });
+    }
+  };
+
+  const exportConnectionTestDebugLog = async () => {
+    if (!debugAsset || terminalLogs.length === 0) return;
+    const version = debugAsset.mcpConfigVersion || debugAsset.version || "—";
+    let runtimeDiagnostics = "";
+    if (debugAsset.transport !== "STDIO") {
+      try {
+        runtimeDiagnostics = await (await getCapabilityTestDebugLog(debugAsset.id)).text();
+      } catch (error) {
+        runtimeDiagnostics = `[DIAGNOSTIC] 运行时诊断采集失败：${errorMessage(error)}`;
+      }
+    }
+    const content = [
+      "MCP 连接测试调试日志",
+      `能力：${debugAsset.name}`,
+      `版本：${version}`,
+      `测试状态：${debugStatus}`,
+      `导出时间：${new Date().toLocaleString()}`,
+      "",
+      "[测试日志]",
+      ...terminalLogs.map((log) => `[${log.time}] [${log.type}] ${log.text}`),
+      ...(runtimeDiagnostics ? ["", runtimeDiagnostics.trim()] : []),
+      "",
+    ].join("\n");
+    downloadDebugLog(new Blob([content], { type: "text/plain;charset=utf-8" }), `mcp-test-${debugAsset.code}-debug.txt`);
+    triggerFlashAlert({ type: "success", title: t.alertCopySuccessTitle, description: t.developerDebugLogExported });
+  };
   const tabCounts = useMemo(() => ({
     all: counts.all ?? 0,
     skill: counts.skill ?? 0,
@@ -677,7 +749,7 @@ export function useDeveloperCapabilities(langCode: "ZH" | "EN" | "JA" | "ES") {
   }), [counts]);
 
   return {
-    assets, tabCounts, totalItems, totalPages, safeCurrentPage,
+    assets, isInitialLoading, tabCounts, totalItems, totalPages, safeCurrentPage,
     searchQuery, setSearchQuery, activeTypeTab, setActiveTypeTab, statusFilter, setStatusFilter,
     pageSize, setPageSize, currentPage, setCurrentPage, resetToFirstPage, handleResetFilters,
     showEditModal, setShowEditModal, isEditing, currentAsset, setCurrentAsset,
@@ -687,13 +759,13 @@ export function useDeveloperCapabilities(langCode: "ZH" | "EN" | "JA" | "ES") {
     newVersionDesc, setNewVersionDesc, newVersionZipName, setNewVersionZipName,
     newVersionZipSize, setNewVersionZipSize, newVersionZipFiles, setNewVersionZipFiles, setNewVersionPackageToken,
     newVersionErrors, handleIncrementVersion, handleNewVersionZipUploaded, handleSaveNewVersion,
-    handleSubmitReview, handleDeployAsset, handleDebugComplete,
+    handleSubmitReview, handleDeployAsset, startDeployAsset, handleDebugComplete,
     handlePublishAsset, handleOfflineAsset, handleDeleteAsset, deleteTarget, setDeleteTarget,
     handleCopyAssetCode, handleOpenDebug, showDebugModal, setShowDebugModal, debugAsset,
     debugStatus, currentStepIndex, terminalLogs, setTerminalLogs, stepDurations, stepStatuses,
-    testStarted, setTestStarted, runRealTest,
+    testStarted, setTestStarted, runRealTest, exportConnectionTestDebugLog,
     showDeployModal, setShowDeployModal, deployAsset, deployStatus, deployCurrentStepIndex,
-    deployTerminalLogs, setDeployTerminalLogs, deployStepStatuses, deployErrorMessage,
+    deployTerminalLogs, setDeployTerminalLogs, deployStepStatuses, deployErrorMessage, exportDeploymentDebugLog,
     flashMessage, triggerFlashAlert,
   };
 }

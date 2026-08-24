@@ -55,7 +55,7 @@ export function DeveloperCenter({
 }: PageProps) {
   const t = getI18n(_langCode);
   const {
-    assets, tabCounts, totalItems, totalPages, safeCurrentPage,
+    assets, isInitialLoading, tabCounts, totalItems, totalPages, safeCurrentPage,
     searchQuery, setSearchQuery, activeTypeTab, setActiveTypeTab, statusFilter, setStatusFilter,
     pageSize, setPageSize, setCurrentPage, resetToFirstPage, handleResetFilters,
     showEditModal, setShowEditModal, isEditing, currentAsset, setCurrentAsset,
@@ -65,14 +65,14 @@ export function DeveloperCenter({
     newVersionDesc, setNewVersionDesc, newVersionZipName, setNewVersionZipName,
     newVersionZipSize, setNewVersionZipSize, newVersionZipFiles, setNewVersionZipFiles, setNewVersionPackageToken,
     newVersionErrors, handleIncrementVersion, handleNewVersionZipUploaded, handleSaveNewVersion,
-    handleSubmitReview, handleDeployAsset, handleDebugComplete,
+    handleSubmitReview, handleDeployAsset, startDeployAsset, handleDebugComplete,
     handlePublishAsset, handleOfflineAsset, handleDeleteAsset, deleteTarget, setDeleteTarget,
     handleCopyAssetCode,
     showDebugModal, setShowDebugModal, debugAsset,
     debugStatus, currentStepIndex, terminalLogs, setTerminalLogs, stepDurations, stepStatuses,
-    testStarted, setTestStarted, runRealTest,
+    testStarted, setTestStarted, runRealTest, exportConnectionTestDebugLog,
     showDeployModal, setShowDeployModal, deployAsset, deployStatus, deployCurrentStepIndex,
-    deployTerminalLogs, setDeployTerminalLogs, deployStepStatuses, deployErrorMessage,
+    deployTerminalLogs, setDeployTerminalLogs, deployStepStatuses, deployErrorMessage, exportDeploymentDebugLog,
     flashMessage, triggerFlashAlert,
   } = useDeveloperCapabilities(_langCode);
 
@@ -214,6 +214,7 @@ export function DeveloperCenter({
         <div className="flex-grow flex-1 min-h-0 flex flex-col gap-2" id="haze-developer-table-wrapper">
           <DeveloperAssetTable
             paginatedAssets={assets}
+            loading={isInitialLoading}
             langCode={_langCode}
             onOpenEditAsset={handleOpenEditAsset}
             onIncrementVersion={handleIncrementVersion}
@@ -321,8 +322,12 @@ export function DeveloperCenter({
         terminalLogs={deployTerminalLogs}
         stepStatuses={deployStepStatuses}
         errorMessage={deployErrorMessage}
+        onStartDeploy={startDeployAsset}
         onClearLogs={() => setDeployTerminalLogs([])}
         onTriggerAlert={triggerFlashAlert}
+        onExportLogs={exportDeploymentDebugLog}
+        exportLabel={t.developerExportDebugLog}
+        exportDisabled={deployTerminalLogs.length === 0}
       />
       <McpConnectionTestDialog
         open={showDebugModal}
@@ -338,6 +343,9 @@ export function DeveloperCenter({
         onStartTest={() => { setTestStarted(true); runRealTest(); }}
         onClearLogs={() => setTerminalLogs([])}
         onTriggerAlert={triggerFlashAlert}
+        onExportLogs={exportConnectionTestDebugLog}
+        exportLabel={t.developerExportDebugLog}
+        exportDisabled={terminalLogs.length === 0}
         steps={debugAsset?.transport === "HTTP" ? MCP_TEST_STEPS : STDIO_TEST_STEPS}
       />
 

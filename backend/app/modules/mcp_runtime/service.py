@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -15,6 +15,8 @@ from app.modules.mcp_runtime.schemas import (
     McpCallLogListData,
     McpDeploymentData,
     McpDeploymentListData,
+    McpRuntimeCapabilityOption,
+    McpRuntimeCapabilityOptionListData,
     McpDeployTaskData,
     McpDeployTaskListData,
     McpTaskCreated,
@@ -66,11 +68,14 @@ def _serialize_deployment(row: McpDeployment, capability: Capability | None, cre
     )
 
 
-def _serialize_task(row: McpDeployTask, version: str | None = None) -> McpDeployTaskData:
+def _serialize_task(
+    row: McpDeployTask, version: str | None = None, capability_name: str | None = None,
+) -> McpDeployTaskData:
     """将任务 ORM 对象转换为响应 Schema。"""
     return McpDeployTaskData(
         id=row.id,
         capability_id=row.capability_id,
+        capability_name=capability_name,
         version_id=row.version_id,
         version=version,
         task_type=row.task_type,
@@ -162,6 +167,63 @@ def get_deployment(db: Session, deployment_id: int, actor: User) -> McpDeploymen
     return _serialize_deployment(row, cap, creator.name if creator else None)
 
 
+def list_filter_capabilities(db: Session, actor: User) -> McpRuntimeCapabilityOptionListData:
+    """返回当前用户可见、存在 MCP 部署记录的能力筛选选项。"""
+    stmt = (
+        select(Capability.id, Capability.name)
+        .join(McpDeployment, McpDeployment.capability_id == Capability.id)
+        .where(Capability.deleted_at.is_(None))
+        .distinct()
+        .order_by(Capability.name.asc())
+    )
+    if not _is_admin(actor):
+        stmt = stmt.where(Capability.created_by == actor.id)
+    return McpRuntimeCapabilityOptionListData(
+        items=[McpRuntimeCapabilityOption(id=capability_id, name=name) for capability_id, name in db.execute(stmt).all()],
+    )
+
+def _record_date_bounds(start_at: date | None, end_at: date | None) -> tuple[datetime, datetime]:
+    """返回本地自然日的左闭右开查询范围，未传时默认近七天。"""
+    today = datetime.now().date()
+    start_date = start_at or today - timedelta(days=6)
+    end_date = end_at or today
+    if end_date < start_date:
+        raise AppException(code=4000, message="结束日期不能早于开始日期", status_code=400)
+    return (
+        datetime.combine(start_date, datetime.min.time()),
+        datetime.combine(end_date + timedelta(days=1), datetime.min.time()),
+    )
+
+
+def _scoped_record_stmt(model, actor: User, *, capability_name: str | None, capability_ids: list[int] | None, start_at: date | None, end_at: date | None):
+    """按既有运行监控权限、能力名称和日期范围过滤记录。"""
+    start_time, end_time = _record_date_bounds(start_at, end_at)
+    stmt = (
+        select(model)
+        .join(Capability, Capability.id == model.capability_id)
+        .where(
+            Capability.deleted_at.is_(None),
+            model.created_at >= start_time,
+            model.created_at < end_time,
+        )
+    )
+    if not _is_admin(actor):
+        stmt = stmt.where(Capability.created_by == actor.id)
+    if capability_name and capability_name.strip():
+        stmt = stmt.where(Capability.name.ilike(f"%{capability_name.strip()}%"))
+    if capability_ids:
+        stmt = stmt.where(Capability.id.in_(capability_ids))
+    return stmt
+
+
+def _capability_name_map(db: Session, capability_ids: set[int]) -> dict[int, str]:
+    if not capability_ids:
+        return {}
+    return {
+        capability.id: capability.name
+        for capability in db.scalars(select(Capability).where(Capability.id.in_(capability_ids))).all()
+    }
+
 # ── 任务记录 ─────────────────────────────────────────────────────────────────
 
 def list_tasks(
@@ -172,9 +234,9 @@ def list_tasks(
     page: int = 1,
     page_size: int = 20,
 ) -> McpDeployTaskListData:
-    """查询部署实例的历史任务列表，按创建时间倒序分页。"""
+    """兼容旧接口：查询单个部署实例所属能力的全部历史任务。"""
     row = _get_deployment_or_404(db, deployment_id, actor)
-
+    capability = db.get(Capability, row.capability_id)
     stmt = select(McpDeployTask).where(McpDeployTask.capability_id == row.capability_id)
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     tasks = db.scalars(
@@ -182,11 +244,48 @@ def list_tasks(
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).all()
-
     version_ids = {task.version_id for task in tasks if task.version_id}
-    versions = {v.id: v.version for v in db.scalars(select(CapabilityVersion).where(CapabilityVersion.id.in_(version_ids))).all()} if version_ids else {}
-    return McpDeployTaskListData(items=[_serialize_task(t, versions.get(t.version_id)) for t in tasks], total=total)
+    versions = {
+        version.id: version.version
+        for version in db.scalars(select(CapabilityVersion).where(CapabilityVersion.id.in_(version_ids))).all()
+    } if version_ids else {}
+    return McpDeployTaskListData(
+        items=[_serialize_task(task, versions.get(task.version_id), capability.name if capability else None) for task in tasks],
+        total=total,
+    )
 
+
+def list_all_tasks(
+    db: Session,
+    actor: User,
+    *,
+    capability_name: str | None = None,
+    capability_ids: list[int] | None = None,
+    start_at: date | None = None,
+    end_at: date | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> McpDeployTaskListData:
+    """按能力名称和日期范围跨能力查询部署任务。"""
+    stmt = _scoped_record_stmt(
+        McpDeployTask, actor, capability_name=capability_name, capability_ids=capability_ids, start_at=start_at, end_at=end_at,
+    )
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    tasks = db.scalars(
+        stmt.order_by(McpDeployTask.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).all()
+    version_ids = {task.version_id for task in tasks if task.version_id}
+    versions = {
+        version.id: version.version
+        for version in db.scalars(select(CapabilityVersion).where(CapabilityVersion.id.in_(version_ids))).all()
+    } if version_ids else {}
+    names = _capability_name_map(db, {task.capability_id for task in tasks})
+    return McpDeployTaskListData(
+        items=[_serialize_task(task, versions.get(task.version_id), names.get(task.capability_id)) for task in tasks],
+        total=total,
+    )
 
 def get_logs(db: Session, deployment_id: int, actor: User) -> str:
     """获取最新一条 deploy 任务的执行日志，无日志时返回空字符串。"""
@@ -203,34 +302,150 @@ def get_logs(db: Session, deployment_id: int, actor: User) -> str:
     return latest_task.logs
 
 
+
+def _redact_debug_text(text: str) -> str:
+    import re
+
+    patterns = (
+        r"(?i)(authorization\s*[:=]\s*bearer\s+)[^\s,;]+",
+        r"(?i)(cookie\s*[:=]\s*)[^\r\n]+",
+        r"(?i)((?:token|credential|password|secret)\s*[:=]\s*)[^\s,;]+",
+    )
+    for pattern in patterns:
+        text = re.sub(pattern, r"\1***", text)
+    return text
+
+
+def get_debug_log(db: Session, deployment_id: int, actor: User) -> str:
+    """导出当前部署任务的脱敏调试日志，不改变任务状态或原始部署流程。"""
+    deployment = _get_deployment_or_404(db, deployment_id, actor)
+    task = db.scalar(
+        select(McpDeployTask)
+        .where(McpDeployTask.capability_id == deployment.capability_id)
+        .order_by(McpDeployTask.created_at.desc())
+        .limit(1)
+    )
+    capability = db.get(Capability, deployment.capability_id)
+    version = db.get(CapabilityVersion, task.version_id) if task and task.version_id else None
+    task_logs = _redact_debug_text(task.logs or "") if task else ""
+    raw_error = _redact_debug_text(task.error_message or "") if task else ""
+
+    lines = [
+        "MCP 部署调试日志",
+        f"能力：{capability.name if capability else deployment.deployment_name}",
+        f"版本：{version.version if version else '—'}",
+        f"部署实例：{deployment.deployment_name}",
+        f"任务类型：{task.task_type if task else '—'}",
+        f"任务状态：{task.task_status if task else deployment.deploy_status}",
+        f"创建时间：{task.created_at.isoformat(sep=' ', timespec='seconds') if task else '—'}",
+        f"完成时间：{task.finished_at.isoformat(sep=' ', timespec='seconds') if task and task.finished_at else '—'}",
+        "",
+        "[调试日志]",
+        task_logs or (f"[TASK_ERROR] {raw_error}" if raw_error else "暂无可导出的任务日志。"),
+    ]
+    return "\n".join(lines).strip() + "\n"
+
 # ── 调用日志 ─────────────────────────────────────────────────────────────────
+
+def _serialize_call(log: McpCallLog, caller_name: str | None, capability_name: str | None) -> McpCallLogData:
+    return McpCallLogData(
+        id=log.id,
+        capability_id=log.capability_id,
+        capability_name=capability_name,
+        deployment_id=log.deployment_id,
+        asset_code=log.asset_code,
+        request_id=log.request_id,
+        user_id=log.user_id,
+        caller_name=caller_name,
+        client_ip=log.client_ip,
+        method=log.method,
+        tool_name=log.tool_name,
+        status_code=log.status_code,
+        success=log.success,
+        duration_ms=log.duration_ms,
+        error_message=log.error_message,
+        created_at=log.created_at,
+    )
+
+
+def _call_metrics(db: Session, stmt) -> tuple[int, int, float | None, int | None]:
+    """计算当前查询范围内的调用聚合指标。"""
+    rows = db.scalars(stmt).all()
+    known_results = [row for row in rows if row.success is not None]
+    durations = [row.duration_ms for row in rows if row.duration_ms is not None]
+    success_rate = round(sum(row.success is True for row in known_results) / len(known_results) * 100, 1) if known_results else None
+    avg_duration = round(sum(durations) / len(durations)) if durations else None
+    return len(rows), sum(row.success is False for row in rows), success_rate, avg_duration
+
 
 def list_calls(
     db: Session, deployment_id: int, actor: User, *, page: int = 1, page_size: int = 20,
 ) -> McpCallLogListData:
-    """查询调用日志，并基于全部今日记录计算指标。"""
+    """兼容旧接口：查询单个部署实例的 Gateway 调用日志。"""
     row = _get_deployment_or_404(db, deployment_id, actor)
+    capability = db.get(Capability, row.capability_id)
     stmt = select(McpCallLog).where(McpCallLog.deployment_id == row.id)
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     logs = db.scalars(stmt.order_by(McpCallLog.created_at.desc()).offset((page - 1) * page_size).limit(page_size)).all()
     user_ids = {log.user_id for log in logs if log.user_id}
     users = {user.id: user.name for user in db.scalars(select(User).where(User.id.in_(user_ids))).all()} if user_ids else {}
-    items = [McpCallLogData(
-        id=log.id, capability_id=log.capability_id, deployment_id=log.deployment_id, asset_code=log.asset_code,
-        request_id=log.request_id, user_id=log.user_id, caller_name=users.get(log.user_id), client_ip=log.client_ip,
-        method=log.method, tool_name=log.tool_name, status_code=log.status_code, success=log.success,
-        duration_ms=log.duration_ms, error_message=log.error_message, created_at=log.created_at,
-    ) for log in logs]
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_logs = db.scalars(select(McpCallLog).where(McpCallLog.deployment_id == row.id, McpCallLog.created_at >= today_start)).all()
-    known_results = [log for log in today_logs if log.success is not None]
-    durations = [log.duration_ms for log in today_logs if log.duration_ms is not None]
-    success_rate = round(sum(log.success is True for log in known_results) / len(known_results) * 100, 1) if known_results else None
-    avg_duration = round(sum(durations) / len(durations)) if durations else None
-    return McpCallLogListData(items=items, total=total, today_total=len(today_logs),
-        today_errors=sum(log.success is False for log in today_logs), success_rate=success_rate, avg_duration_ms=avg_duration)
+    today_total, today_errors, success_rate, avg_duration = _call_metrics(db, stmt.where(McpCallLog.created_at >= today_start))
+    period_total, period_errors, _, _ = _call_metrics(db, stmt)
+    available_methods = sorted({method for method in db.scalars(stmt.with_only_columns(McpCallLog.method).distinct()).all() if method})
+    return McpCallLogListData(
+        items=[_serialize_call(log, users.get(log.user_id), capability.name if capability else None) for log in logs],
+        total=total,
+        today_total=today_total,
+        today_errors=today_errors,
+        success_rate=success_rate,
+        avg_duration_ms=avg_duration,
+        period_total=period_total,
+        period_errors=period_errors,
+        available_methods=available_methods,
+    )
 
+
+def list_all_calls(
+    db: Session,
+    actor: User,
+    *,
+    capability_name: str | None = None,
+    capability_ids: list[int] | None = None,
+    start_at: date | None = None,
+    end_at: date | None = None,
+    methods: list[str] | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> McpCallLogListData:
+    """按能力名称、日期和 MCP 方法跨能力查询调用日志。"""
+    base_stmt = _scoped_record_stmt(
+        McpCallLog, actor, capability_name=capability_name, capability_ids=capability_ids, start_at=start_at, end_at=end_at,
+    )
+    available_methods = sorted({method for method in db.scalars(base_stmt.with_only_columns(McpCallLog.method).distinct()).all() if method})
+    stmt = base_stmt.where(McpCallLog.method.in_(methods)) if methods else base_stmt
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    logs = db.scalars(
+        stmt.order_by(McpCallLog.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).all()
+    user_ids = {log.user_id for log in logs if log.user_id}
+    users = {user.id: user.name for user in db.scalars(select(User).where(User.id.in_(user_ids))).all()} if user_ids else {}
+    names = _capability_name_map(db, {log.capability_id for log in logs})
+    period_total, period_errors, success_rate, avg_duration = _call_metrics(db, stmt)
+    return McpCallLogListData(
+        items=[_serialize_call(log, users.get(log.user_id), names.get(log.capability_id)) for log in logs],
+        total=total,
+        today_total=period_total,
+        today_errors=period_errors,
+        success_rate=success_rate,
+        avg_duration_ms=avg_duration,
+        period_total=period_total,
+        period_errors=period_errors,
+        available_methods=available_methods,
+    )
 
 # ── 运行操作 ─────────────────────────────────────────────────────────────────
 

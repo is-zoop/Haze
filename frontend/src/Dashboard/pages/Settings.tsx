@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PageHeader } from "../../components/common/PageHeader";
 import { DataTableFooter } from "../../components/common/DataTableFooter";
+import { TableSkeleton } from "../../components/common/TableSkeleton";
+import { TableEmptyState } from "../../components/common/TableEmptyState";
 import { getI18n } from "../../i18n";
 import { ApiError } from "@/lib/api";
 import {
@@ -96,6 +98,7 @@ const readStoredAuthUser = (): StoredAuthUser | null => {
 export function Settings({ onBackToHome: _onBackToHome, langCode: _langCode = "ZH" }: PageProps) {
   const t = getI18n(_langCode);
   const [members, setMembers] = useState<SystemMember[]>([]);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [counts, setCounts] = useState({ all: 0, active: 0, disabled: 0 });
   const [totalItems, setTotalItems] = useState(0);
   const [departments, setDepartments] = useState<string[]>([]);
@@ -222,6 +225,7 @@ export function Settings({ onBackToHome: _onBackToHome, langCode: _langCode = "Z
     } catch (error) {
       showFlash({ type: "error", title: t.alertLoadFailedTitle, description: getErrorMessage(error) });
     }
+    finally { setIsInitialLoading(false); }
   }, [currentPage, pageSize, searchQuery, roleFilter, statusTab]);
 
   useEffect(() => {
@@ -434,7 +438,7 @@ export function Settings({ onBackToHome: _onBackToHome, langCode: _langCode = "Z
     </div>
   );
   return (
-    <div className="dashboard-page-stack h-full overflow-hidden text-left font-sans flex flex-col gap-3 animate-in fade-in duration-300" id="haze-settings-page-container">
+    <div className="dashboard-page-stack h-full overflow-hidden text-left font-sans flex flex-col gap-3" id="haze-settings-page-container">
       <PageHeader
         title={t.memberMgmt_title}
         description={t.memberMgmt_desc}
@@ -592,8 +596,10 @@ export function Settings({ onBackToHome: _onBackToHome, langCode: _langCode = "Z
                   </TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {paginatedMembers.map((member) => (
+              <TableBody aria-busy={isInitialLoading}>
+                {isInitialLoading ? (
+                  <TableSkeleton columnCount={8} leadingVisual actionColumn />
+                ) : paginatedMembers.map((member) => (
                   <TableRow key={member.id}>
                     {/* Member (16%) */}
                     <TableCell className="w-[16%] min-w-0">
@@ -741,12 +747,8 @@ export function Settings({ onBackToHome: _onBackToHome, langCode: _langCode = "Z
                     </TableCell>
                   </TableRow>
                 ))}
-                {paginatedMembers.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={8} className="h-32 text-center text-muted-foreground font-semibold">
-                      {t.memberMgmt_noMatches}
-                    </TableCell>
-                  </TableRow>
+                {!isInitialLoading && paginatedMembers.length === 0 && (
+                  <TableEmptyState colSpan={8} title={t.memberMgmt_noMatches} />
                 )}
               </TableBody>
             </Table>

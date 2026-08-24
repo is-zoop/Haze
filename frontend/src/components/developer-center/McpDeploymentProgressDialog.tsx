@@ -1,4 +1,4 @@
-﻿import { Rocket, XCircle } from "lucide-react";
+import { Rocket, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,8 +21,12 @@ interface McpDeploymentProgressDialogProps {
   stepStatuses?: Record<number, "pass" | "fail">;
   stepDurations?: Record<number, string>;
   errorMessage?: string | null;
+  onStartDeploy: () => void;
   onClearLogs: () => void;
   onTriggerAlert: (msg: string) => void;
+  onExportLogs: () => void;
+  exportLabel: string;
+  exportDisabled: boolean;
 }
 
 const DEPLOY_STEPS = [
@@ -45,8 +49,12 @@ export function McpDeploymentProgressDialog({
   stepStatuses = {},
   stepDurations = {},
   errorMessage,
+  onStartDeploy,
   onClearLogs,
   onTriggerAlert,
+  onExportLogs,
+  exportLabel,
+  exportDisabled,
 }: McpDeploymentProgressDialogProps) {
   if (!asset) return null;
 
@@ -56,11 +64,17 @@ export function McpDeploymentProgressDialog({
     ? "部署失败"
     : deployStatus === "creating"
     ? "创建部署任务中"
+    : deployStatus === "idle"
+    ? "等待开始部署"
     : "部署进行中";
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="flex h-[580px] w-full max-w-4xl flex-col gap-0 rounded-xl border-slate-200 bg-white p-5 shadow-xl">
+      <DialogContent
+        onPointerDownOutside={(event) => event.preventDefault()}
+        onEscapeKeyDown={(event) => event.preventDefault()}
+        className="flex h-[580px] w-full max-w-4xl flex-col gap-0 rounded-xl border-slate-200 bg-white p-5 shadow-xl"
+      >
         <DialogHeader className="shrink-0 border-b border-slate-100 pb-3 pr-10">
           <DialogTitle className="flex items-center gap-2 text-left text-sm font-bold text-slate-800">
             <Rocket size={14} className="text-blue-500" />
@@ -91,11 +105,23 @@ export function McpDeploymentProgressDialog({
             langCode={langCode}
             onClearLogs={onClearLogs}
             onTriggerAlert={onTriggerAlert}
+            onExportLogs={onExportLogs}
+            exportLabel={exportLabel}
+            exportDisabled={exportDisabled}
           />
         </div>
 
         <div className="flex shrink-0 items-center justify-between border-t border-slate-100 pt-3.5 text-xs text-slate-500 select-none">
-          <span>{deployStatus === "running" || deployStatus === "creating" ? "每 2 秒自动刷新部署状态" : "部署任务已结束"}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onStartDeploy}
+            disabled={deployStatus === "creating" || deployStatus === "running"}
+            className="h-9 px-3.5 text-xs font-semibold rounded-lg"
+          >
+            <Rocket className="mr-1.5 h-3.5 w-3.5 text-slate-500" />
+            <span>{langCode === "ZH" ? "开始部署" : "Start Deploy"}</span>
+          </Button>
           <Button
             size="sm"
             onClick={onClose}

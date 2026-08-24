@@ -10,7 +10,7 @@ const Table = React.forwardRef<
     <table
       ref={ref}
       className={cn(
-        "w-full caption-bottom text-xs [&_th]:!text-left [&_th]:!text-xs [&_th]:!font-bold [&_td]:!text-xs [&_td]:!font-normal [&_tbody_tr]:!bg-white [&_tbody_td]:!bg-white [&_tbody_td_*]:!text-xs [&_td[data-table-action=true]]:!text-left [&_td[data-table-action=true]>div]:!justify-start [&_[data-slot=badge]]:!text-xs [&_[data-slot=badge]]:!font-semibold",
+        "w-full min-w-max caption-bottom text-xs [&_th]:!text-left [&_th]:!text-xs [&_th]:!font-bold [&_td]:!text-xs [&_td]:!font-normal [&_tbody_tr]:!bg-white [&_tbody_td]:!bg-white [&_tbody_td_*]:!text-xs [&_td[data-table-action=true]]:!text-center [&_td[data-table-action=true]>div]:!mx-auto [&_td[data-table-action=true]>div]:!justify-center [&_[data-slot=badge]]:!text-xs [&_[data-slot=badge]]:!font-semibold",
         className
       )}
       {...props}
@@ -95,7 +95,7 @@ const TableCell = React.forwardRef<
   <td
     ref={ref}
     className={cn(
-      "min-w-32 bg-white p-2 align-middle [&:has([role=checkbox])]:pr-0 data-[table-action=true]:sticky data-[table-action=true]:right-0 data-[table-action=true]:z-10 data-[table-action=true]:bg-white data-[table-action=true]:shadow-[-1px_0_0_0_rgba(15,23,42,0.08)]",
+      "min-w-32 bg-white p-2 align-middle [&:has([role=checkbox])]:pr-0 data-[table-action=true]:sticky data-[table-action=true]:right-0 data-[table-action=true]:z-0 data-[table-action=true]:bg-white data-[table-action=true]:shadow-[-1px_0_0_0_rgba(15,23,42,0.08)]",
       className
     )}
     {...props}

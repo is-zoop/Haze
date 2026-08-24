@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Annotated, AsyncGenerator, Literal
 
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
@@ -17,6 +18,8 @@ from app.modules.capabilities import service
 from app.modules.capabilities.models import Capability
 from app.modules.capabilities.test_runner import run_http_mcp_test, run_stdio_mcp_test
 from app.modules.mcp_runtime.models import McpDeployment
+from worker.config import get_worker_settings
+from worker.kubernetes_provider import KubernetesRuntimeProvider
 from app.modules.capabilities.schemas import (
     CapabilityCreate,
     CapabilityData,
@@ -331,6 +334,72 @@ async def run_capability_test(
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
         },
+    )
+
+
+@router.get("/capabilities/{capability_id}/test-debug-log", response_class=PlainTextResponse)
+def download_test_debug_log(
+    capability_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    actor: Annotated[User, Depends(require_capabilities("capabilities.read"))],
+) -> PlainTextResponse:
+    """按需采集 HTTP MCP 当前运行实例的脱敏测试诊断，不持久化测试日志。"""
+    capability = db.scalar(
+        select(Capability).where(Capability.id == capability_id, Capability.deleted_at.is_(None))
+    )
+    if capability is None:
+        from app.core.exceptions import AppException
+        raise AppException(code=4042, message="Capability not found", status_code=404)
+
+    config = (capability.extension_json or {}).get("config", {})
+    transport = config.get("transport", "HTTP") if isinstance(config, dict) else "HTTP"
+    lines = [
+        "MCP 连接测试运行时诊断",
+        f"能力：{capability.name}",
+        f"传输方式：{transport}",
+        "",
+        "[运行时诊断]",
+    ]
+    if transport == "STDIO":
+        lines.append("STDIO MCP 没有 K8s Pod，导出文件仅包含当前连接测试日志。")
+    else:
+        deployment = db.scalar(
+            select(McpDeployment)
+            .where(McpDeployment.capability_id == capability.id)
+            .order_by(McpDeployment.id.desc())
+        )
+        if deployment is None:
+            lines.append("未找到关联部署实例，无法采集 Pod 诊断。")
+        else:
+            try:
+                diagnostics = KubernetesRuntimeProvider(
+                    get_worker_settings()
+                ).collect_failure_diagnostics(deployment)
+            except Exception as exc:
+                diagnostics = f"[DETAIL] [K8S] 诊断采集失败：{exc}"
+            diagnostics = re.sub(
+                r"(?i)(authorization\s*[:=]\s*bearer\s+)[^\s,;]+",
+                r"\1***",
+                diagnostics,
+            )
+            diagnostics = re.sub(
+                r"(?i)(cookie\s*[:=]\s*)[^\r\n]+",
+                r"\1***",
+                diagnostics,
+            )
+            diagnostics = re.sub(
+                r"(?i)((?:token|credential|password|secret)\s*[:=]\s*)[^\s,;]+",
+                r"\1***",
+                diagnostics,
+            )
+            if len(diagnostics) > 20_000:
+                diagnostics = f"{diagnostics[:4_000]}\n[DETAIL] 日志过长，已省略中间内容\n{diagnostics[-14_000:]}"
+            lines.append(diagnostics)
+
+    content = "\n".join(lines).strip() + "\n"
+    return PlainTextResponse(
+        content,
+        headers={"Content-Disposition": f'attachment; filename="mcp-test-{capability_id}-debug.txt"'},
     )
 
 

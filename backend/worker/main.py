@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from datetime import datetime, timezone
 
@@ -37,6 +38,76 @@ def _make_session_factory():
 def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
+
+_DIAGNOSTIC_LIMIT = 20_000
+_SECRET_PATTERNS = (
+    re.compile(r"(?i)(authorization\s*[:=]\s*bearer\s+)[^\s,;]+"),
+    re.compile(r"(?i)(cookie\s*[:=]\s*)[^\r\n]+"),
+    re.compile(r"(?i)((?:token|credential|password|secret)\s*[:=]\s*)[^\s,;]+"),
+)
+
+
+def _sanitize_diagnostic(text: str) -> str:
+    sanitized = text
+    for pattern in _SECRET_PATTERNS:
+        sanitized = pattern.sub(r"\1***", sanitized)
+    if len(sanitized) > _DIAGNOSTIC_LIMIT:
+        sanitized = f"{sanitized[:4_000]}\n[DETAIL] 日志过长，已省略中间内容\n{sanitized[-14_000:]}"
+    return sanitized
+
+
+def _first_matching_line(text: str, markers: tuple[str, ...]) -> str | None:
+    for line in reversed(text.splitlines()):
+        stripped = line.strip()
+        if stripped and any(marker in stripped for marker in markers):
+            return stripped.removeprefix("[DETAIL] ")
+    return None
+
+
+def _deployment_failure_summary(dep: McpDeployment | None, exc: Exception, details: str) -> str:
+    error = str(exc).strip()
+    if isinstance(exc, McpBuildError) or (dep is not None and dep.deploy_status == enums.DEPLOY_STATUS_BUILDING):
+        detail = _first_matching_line(error, ("error", "Error", "ENOENT", "缺少", "失败")) or error.splitlines()[-1]
+        return f"[BUILD] 镜像构建失败：{detail}"
+    if "FailedCreatePodSandBox" in details:
+        detail = _first_matching_line(details, ("FailedCreatePodSandBox",)) or "Pod 网络初始化失败"
+        return f"[K8S] Pod 网络初始化失败：{detail}"
+    if "ImagePullBackOff" in details or "ErrImagePull" in details:
+        detail = _first_matching_line(details, ("ImagePullBackOff", "ErrImagePull")) or "镜像拉取失败"
+        return f"[K8S] 镜像拉取失败：{detail}"
+    if "ModuleNotFoundError" in details and "mcp.server.fastmcp" in details:
+        return (
+            "[CONTAINER] 服务启动失败：Python 依赖缺失或版本不兼容，"
+            "无法导入 mcp.server.fastmcp"
+        )
+    container_error = _first_matching_line(
+        details,
+        ("ModuleNotFoundError", "Missing required environment variable", "Traceback", "Error:"),
+    )
+    if container_error:
+        return f"[CONTAINER] 服务启动失败：{container_error}"
+    if "CrashLoopBackOff" in details or "Back-off restarting" in details:
+        return "[CONTAINER] 服务启动后异常退出，请导出调试日志查看详情"
+    if "未就绪" in error or "not ready" in error.lower():
+        return f"[READY] {error}，请导出调试日志查看详情"
+    if "Gateway" in error:
+        return f"[ROUTE] Gateway 路由同步失败：{error}"
+    return f"[DEPLOY] 部署失败：{error or '未知错误'}"
+
+
+def _collect_failure_logs(dep: McpDeployment | None, exc: Exception) -> str:
+    details = ""
+    if dep is not None:
+        try:
+            details = KubernetesRuntimeProvider(get_worker_settings()).collect_failure_diagnostics(dep)
+        except Exception as diagnostic_exc:
+            details = f"[DETAIL] [K8S] 诊断采集失败：{diagnostic_exc}"
+    summary = _deployment_failure_summary(dep, exc, details)
+    raw_error = _sanitize_diagnostic(str(exc))
+    detail_lines = [f"[DETAIL] [TASK_ERROR] {raw_error}"]
+    if details:
+        detail_lines.append(_sanitize_diagnostic(details))
+    return "\n".join([f"[SUMMARY] {summary}", *detail_lines])
 
 def _claim_next_task(db: Session) -> McpDeployTask | None:
     """SELECT FOR UPDATE SKIP LOCKED 抢占一条 pending 任务并原子标记为 running。"""
@@ -336,15 +407,17 @@ def _process_task(db: Session, task: McpDeployTask) -> None:
         try:
             # rollback 后对象已 expire，通过 PK 重新加载以获取 running 状态
             task = db.get(McpDeployTask, task_id)
-            if task:
-                task.task_status = enums.TASK_STATUS_FAILED
-                task.error_message = str(exc)
-                task.finished_at = now
             dep = db.scalar(
                 select(McpDeployment).where(
                     McpDeployment.capability_id == capability_id
                 )
             )
+            if task:
+                task.task_status = enums.TASK_STATUS_FAILED
+                task.error_message = str(exc)
+                if task_type in {enums.TASK_TYPE_DEPLOY, enums.TASK_TYPE_REDEPLOY}:
+                    task.logs = _collect_failure_logs(dep, exc)
+                task.finished_at = now
             if dep:
                 dep.deploy_status = enums.DEPLOY_STATUS_FAILED
                 dep.last_error = str(exc)

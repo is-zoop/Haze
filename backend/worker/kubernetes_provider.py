@@ -318,18 +318,59 @@ class KubernetesRuntimeProvider:
         return image, name, internal_url
 
     def wait_for_ready(self, dep: McpDeployment, timeout_seconds: int) -> bool:
-        """轮询 Deployment.status.ready_replicas 直到 >= 1 或超时。Mock 模式立即返回 True。"""
+        """轮询 Pod 状态，连续两次就绪后才返回成功。Mock 模式立即返回 True。"""
         if self._mock:
             logger.info("[Mock] wait_for_ready 立即返回 True，deployment=%s", dep.deployment_name)
             return True
 
         deadline = time.monotonic() + timeout_seconds
+        stable_ready_polls = 0
         while time.monotonic() < deadline:
             d = self._apps.read_namespaced_deployment(dep.deployment_name, dep.namespace)
+            pods = self._core.list_namespaced_pod(
+                dep.namespace,
+                label_selector=f"app={dep.deployment_name}",
+            )
+            startup_failure = self._pod_startup_failure(pods.items)
+            if startup_failure:
+                raise RuntimeError(
+                    f"Pod {dep.deployment_name} 服务启动失败：{startup_failure}"
+                )
             if (d.status.ready_replicas or 0) >= 1:
-                return True
+                stable_ready_polls += 1
+                if stable_ready_polls >= 2:
+                    return True
+            else:
+                stable_ready_polls = 0
             time.sleep(self._settings.pod_ready_poll_seconds)
         return False
+
+    @staticmethod
+    def _pod_startup_failure(pods: list) -> str | None:
+        """返回应立即终止部署等待的容器启动失败原因。"""
+        fatal_waiting_reasons = {"CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull"}
+        for pod in pods:
+            pod_name = pod.metadata.name or "unknown"
+            for status in pod.status.container_statuses or []:
+                state = status.state
+                waiting = state.waiting if state else None
+                if waiting and waiting.reason in fatal_waiting_reasons:
+                    message = f"：{waiting.message}" if waiting.message else ""
+                    return f"Pod {pod_name} 容器 {status.name} {waiting.reason}{message}"
+
+                terminated_states = (
+                    state.terminated if state else None,
+                    status.last_state.terminated if status.last_state else None,
+                )
+                for terminated in terminated_states:
+                    if terminated and (terminated.exit_code or 0) != 0:
+                        reason = terminated.reason or "Unknown"
+                        message = f"：{terminated.message}" if terminated.message else ""
+                        return (
+                            f"Pod {pod_name} 容器 {status.name} 已异常退出"
+                            f"（{reason}，退出码 {terminated.exit_code}）{message}"
+                        )
+        return None
 
     def start(self, dep: McpDeployment) -> None:
         """将 replicas 设为 1，恢复已停止的服务。"""
@@ -431,3 +472,79 @@ class KubernetesRuntimeProvider:
             )
         except kubernetes.client.exceptions.ApiException:
             return ""
+
+    def collect_failure_diagnostics(self, dep: McpDeployment, tail_lines: int = 80) -> str:
+        """采集部署失败的最小 K8s 诊断信息，不影响正常部署流程。"""
+        if self._mock:
+            return "[DETAIL] [K8S] Mock 模式：无真实集群诊断信息"
+
+        try:
+            pods = self._core.list_namespaced_pod(
+                dep.namespace,
+                label_selector=f"app={dep.deployment_name}",
+            )
+        except Exception as exc:
+            return f"[DETAIL] [K8S] 无法查询 Pod 状态：{exc}"
+
+        if not pods.items:
+            return "[DETAIL] [K8S] 未找到关联 Pod，无法获取容器日志"
+
+        pod = sorted(
+            pods.items,
+            key=lambda item: str(item.metadata.creation_timestamp or ""),
+            reverse=True,
+        )[0]
+        pod_name = pod.metadata.name
+        lines = [
+            f"[DETAIL] [POD] 名称：{pod_name}",
+            f"[DETAIL] [POD] 阶段：{pod.status.phase or 'Unknown'}",
+        ]
+
+        images = {container.name: container.image for container in pod.spec.containers or []}
+        for status in pod.status.container_statuses or []:
+            state = status.state
+            if state.waiting:
+                detail = f"等待中：{state.waiting.reason or 'Unknown'}"
+                if state.waiting.message:
+                    detail += f" - {state.waiting.message}"
+            elif state.terminated:
+                detail = f"已退出：{state.terminated.reason or 'Unknown'}，退出码：{state.terminated.exit_code}"
+                if state.terminated.message:
+                    detail += f" - {state.terminated.message}"
+            else:
+                detail = "运行中"
+            lines.append(
+                f"[DETAIL] [CONTAINER] {status.name}：镜像：{images.get(status.name, '—')}，{detail}，重启次数：{status.restart_count}"
+            )
+
+        try:
+            events = self._core.list_namespaced_event(
+                dep.namespace,
+                field_selector=f"involvedObject.name={pod_name}",
+            )
+            warnings = [event for event in events.items if event.type == "Warning"]
+            for event in warnings[-10:]:
+                lines.append(
+                    f"[DETAIL] [EVENT] {event.reason or 'Unknown'}: {event.message or ''}"
+                )
+        except Exception as exc:
+            lines.append(f"[DETAIL] [K8S] 无法查询 Pod 事件：{exc}")
+
+        for label, previous in (("CONTAINER_LOG", False), ("CONTAINER_LOG_PREVIOUS", True)):
+            try:
+                logs = self._core.read_namespaced_pod_log(
+                    pod_name,
+                    dep.namespace,
+                    tail_lines=tail_lines,
+                    previous=previous,
+                )
+            except kubernetes.client.exceptions.ApiException:
+                logs = ""
+            except Exception as exc:
+                lines.append(f"[DETAIL] [{label}] 无法读取：{exc}")
+                logs = ""
+            if logs:
+                lines.append(f"[DETAIL] [{label}]")
+                lines.extend(f"[DETAIL] {line}" for line in logs.splitlines())
+
+        return "\n".join(lines)

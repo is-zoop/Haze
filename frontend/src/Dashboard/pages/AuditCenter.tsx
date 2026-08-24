@@ -3,13 +3,13 @@ import {
   Search,
   X,
   Sparkles,
-  Clock,
+
   ThumbsUp,
   ThumbsDown,
   RotateCw,
-  Percent,
-  Timer,
-  CheckCheck,
+
+
+
   Cpu,
   Calendar,
 } from "lucide-react";
@@ -43,13 +43,15 @@ import { PageHeader } from "../../components/common/PageHeader";
 import { CapabilityIcon } from "@/components/common/CapabilityIcon";
 import { DataTableFooter } from "../../components/common/DataTableFooter";
 import { StatusBadge } from "../../components/common/StatusBadge";
+import { TableSkeleton } from "../../components/common/TableSkeleton";
+import { TableEmptyState } from "../../components/common/TableEmptyState";
 import {
   AuditCapabilityItem,
   AuditDetail,
-  AuditStats,
+
   fetchAuditCapabilities,
   fetchAuditDetail,
-  fetchAuditStats,
+
   reviewCapability,
 } from "../../lib/audit";
 
@@ -70,12 +72,9 @@ export function AuditCenter({ onBackToHome: _onBackToHome, langCode: _langCode =
     approved: _langCode === "ZH" ? "已通过" : "Approved",
   };
 
-  const [stats, setStats] = useState<AuditStats | null>(null);
   const [items, setItems] = useState<AuditCapabilityItem[]>([]);
   const [totalItems, setTotalItems] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [statsLoading, setStatsLoading] = useState(false);
-
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [deptFilter, setDeptFilter] = useState("all");
@@ -99,20 +98,8 @@ export function AuditCenter({ onBackToHome: _onBackToHome, langCode: _langCode =
     setTimeout(() => setAlertMsg(null), 3000);
   };
 
-  const loadStats = useCallback(async () => {
-    setStatsLoading(true);
-    try {
-      const s = await fetchAuditStats();
-      setStats(s);
-    } catch {
-      // ignore
-    } finally {
-      setStatsLoading(false);
-    }
-  }, []);
-
   const loadItems = useCallback(async () => {
-    setLoading(true);
+
     try {
       const statusParam = activeTab === "pending" ? "reviewing" : activeTab === "approved" ? "approved" : activeTab;
       const result = await fetchAuditCapabilities({
@@ -128,13 +115,10 @@ export function AuditCenter({ onBackToHome: _onBackToHome, langCode: _langCode =
       setItems([]);
       setTotalItems(0);
     } finally {
-      setLoading(false);
+      setIsInitialLoading(false);
+
     }
   }, [activeTab, currentPage, pageSize, searchQuery, typeFilter]);
-
-  useEffect(() => {
-    loadStats();
-  }, [loadStats]);
 
   useEffect(() => {
     loadItems();
@@ -172,14 +156,12 @@ export function AuditCenter({ onBackToHome: _onBackToHome, langCode: _langCode =
 
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
 
-  // Tab counts from stats
-  const countPending = stats?.pending ?? 0;
   const countAll = totalItems;
 
   const auditCenterTabs: TabItem[] = [
     {
       value: "pending",
-      label: `${_langCode === "ZH" ? "待审核" : "Pending"} (${countPending})`,
+      label: `${_langCode === "ZH" ? "待审核" : "Pending"}`,
     },
     {
       value: "approved",
@@ -197,7 +179,7 @@ export function AuditCenter({ onBackToHome: _onBackToHome, langCode: _langCode =
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([loadStats(), loadItems()]);
+    await loadItems();
     setIsRefreshing(false);
     triggerAlert({ type: "success", title: t.alertRefreshSuccessTitle, description: t.auditRefreshSuccess });
   };
@@ -233,7 +215,7 @@ export function AuditCenter({ onBackToHome: _onBackToHome, langCode: _langCode =
       setSelectedId(null);
       setDetail(null);
       setComment("");
-      await Promise.all([loadStats(), loadItems()]);
+      await loadItems();
     } catch {
       triggerAlert({ type: "error", title: t.alertOperationFailedTitle, description: t.auditActionFailed });
     } finally {
@@ -245,7 +227,7 @@ export function AuditCenter({ onBackToHome: _onBackToHome, langCode: _langCode =
   const isPending = selectedItem?.status === "reviewing";
 
   return (
-    <div className="dashboard-page-stack h-full overflow-hidden text-left font-sans flex flex-col gap-3 animate-in fade-in duration-300" id="haze-publish-review-container">
+    <div className="dashboard-page-stack h-full overflow-hidden text-left font-sans flex flex-col gap-3" id="haze-publish-review-container">
       <PageHeader
         title={t.auditTitle}
         description={t.auditDesc}
@@ -266,73 +248,6 @@ export function AuditCenter({ onBackToHome: _onBackToHome, langCode: _langCode =
       />
 
       <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-border/70 bg-white shadow-2xs p-4 pt-2.5 pb-2.5 gap-3 overflow-hidden">
-
-        {/* Metrics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
-          <div className="rounded-xl border border-border/70 bg-card p-5 shadow-sm h-[112px] flex items-center gap-4">
-            <div className="size-11 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
-              <Clock size={20} className="stroke-[2.2]" />
-            </div>
-            <div className="flex-1 min-w-0 flex flex-col justify-center">
-              <p className="text-sm font-medium text-slate-500 leading-none">
-                {_langCode === "ZH" ? "待我审核" : "Pending Reviews"}
-              </p>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl font-semibold text-slate-900 leading-none font-sans">
-                  {statsLoading ? "—" : (stats?.pending ?? 0)}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-border/70 bg-card p-5 shadow-sm h-[112px] flex items-center gap-4">
-            <div className="size-11 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center shrink-0">
-              <CheckCheck size={20} className="stroke-[2.2]" />
-            </div>
-            <div className="flex-1 min-w-0 flex flex-col justify-center">
-              <p className="text-sm font-medium text-slate-500 leading-none">
-                {_langCode === "ZH" ? "今日已审核" : "Reviewed Today"}
-              </p>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl font-semibold text-slate-900 leading-none font-sans">
-                  {statsLoading ? "—" : (stats?.today_reviewed ?? 0)}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-border/70 bg-card p-5 shadow-sm h-[112px] flex items-center gap-4">
-            <div className="size-11 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
-              <Percent size={20} className="stroke-[2.2]" />
-            </div>
-            <div className="flex-1 min-w-0 flex flex-col justify-center">
-              <p className="text-sm font-medium text-slate-500 leading-none">
-                {_langCode === "ZH" ? "本周通过率" : "Weekly Approval Rate"}
-              </p>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl font-semibold text-slate-900 leading-none font-sans">
-                  {statsLoading ? "—" : stats?.week_pass_rate != null ? `${stats.week_pass_rate}%` : "—"}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-border/70 bg-card p-5 shadow-sm h-[112px] flex items-center gap-4">
-            <div className="size-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-              <Timer size={20} className="stroke-[2.2]" />
-            </div>
-            <div className="flex-1 min-w-0 flex flex-col justify-center">
-              <p className="text-sm font-medium text-slate-500 leading-none">
-                {_langCode === "ZH" ? "平均审核时长" : "Avg Review Duration"}
-              </p>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl font-semibold text-slate-900 leading-none font-sans">
-                  {statsLoading ? "—" : stats?.avg_review_hours != null ? `${stats.avg_review_hours}h` : "—"}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Tabs */}
         <div className="border-none p-0 bg-transparent shrink-0">
@@ -469,19 +384,11 @@ export function AuditCenter({ onBackToHome: _onBackToHome, langCode: _langCode =
                   <TableHead style={{ width: "14%" }} data-table-action="true">{_langCode === "ZH" ? "操作" : "Action"}</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-12 text-slate-400">
-                      {_langCode === "ZH" ? "加载中..." : "Loading..."}
-                    </TableCell>
-                  </TableRow>
+              <TableBody aria-busy={isInitialLoading}>
+                {isInitialLoading ? (
+                  <TableSkeleton columnCount={7} leadingVisual actionColumn />
                 ) : filteredItems.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-12 text-slate-400">
-                      {_langCode === "ZH" ? "暂无数据" : "No data"}
-                    </TableCell>
-                  </TableRow>
+                  <TableEmptyState colSpan={7} title={_langCode === "ZH" ? "暂无数据" : "No data"} />
                 ) : filteredItems.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell>

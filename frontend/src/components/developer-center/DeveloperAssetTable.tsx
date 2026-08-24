@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Table,
   TableBody,
@@ -41,6 +40,8 @@ import { DeveloperAsset } from "../../types/developer-center";
 import { StatusBadge } from "../common/StatusBadge";
 import { CapabilityIcon } from "../common/CapabilityIcon";
 import { getI18n } from "../../i18n";
+import { TableSkeleton } from "../common/TableSkeleton";
+import { TableEmptyState } from "../common/TableEmptyState";
 
 const tableStatusClassName = "flex items-center gap-1.5 text-xs font-semibold";
 
@@ -152,6 +153,7 @@ function renderDeployStatusBadge(asset: DeveloperAsset, lang: string = "ZH") {
 
 interface DeveloperAssetTableProps {
   paginatedAssets: DeveloperAsset[];
+  loading: boolean;
   langCode: string;
   onOpenEditAsset: (asset: DeveloperAsset) => void;
   onIncrementVersion: (asset: DeveloperAsset) => void;
@@ -182,6 +184,7 @@ function getFlowActions(asset: DeveloperAsset) {
 
 export function DeveloperAssetTable({
   paginatedAssets,
+  loading,
   langCode,
   onOpenEditAsset,
   onIncrementVersion,
@@ -274,10 +277,8 @@ export function DeveloperAssetTable({
   };
 
   return (
-    <div className="flex-grow flex-1 min-h-0 overflow-hidden rounded-xl border border-border/60 bg-white" id="haze-developer-table-container">
-      <ScrollArea className="h-full w-full">
-        <div className="min-w-[1640px]">
-          <Table className="table-fixed">
+    <div className="flex-grow flex-1 min-h-0 min-w-0 rounded-xl border border-border/60 bg-white" id="haze-developer-table-container">
+      <Table className="min-w-[1640px] table-fixed" style={{ width: "100%" }}>
             <TableHeader className="sticky top-0 z-10">
               <TableRow className="hover:bg-transparent">
                 <TableHead className="w-[240px]">{langCode === "ZH" ? "能力名称" : langCode === "JA" ? "機能名" : langCode === "ES" ? "Nombre de Capacidad" : "Capability Name"}</TableHead>
@@ -292,8 +293,10 @@ export function DeveloperAssetTable({
                 <TableHead className="w-[420px]" data-table-action="true">{langCode === "ZH" ? "操作" : langCode === "JA" ? "操作" : langCode === "ES" ? "Acciones" : "Actions"}</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {paginatedAssets.map((asset) => {
+            <TableBody aria-busy={loading}>
+              {loading ? (
+                <TableSkeleton columnCount={10} leadingVisual actionColumn />
+              ) : paginatedAssets.map((asset) => {
                 const cleanProject = asset.project.split(" (")[0];
                 const flow = getFlowActions(asset);
                 return (
@@ -440,20 +443,14 @@ export function DeveloperAssetTable({
                   </TableRow>
                 );
               })}
-              {paginatedAssets.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={9} className="h-40 text-center font-normal text-muted-foreground bg-white text-left">
-                    {langCode === "ZH" ? "暂无匹配的能力注册项" 
-                     : langCode === "JA" ? "該当する機能登録が見得つかりません" 
-                     : langCode === "ES" ? "No se encontraron capacidades registradas coincidentes" 
-                     : "No matching registered capabilities found"}
-                  </TableCell>
-                </TableRow>
+              {!loading && paginatedAssets.length === 0 && (
+                <TableEmptyState
+                  colSpan={10}
+                  title={langCode === "ZH" ? "暂无匹配的能力注册项" : langCode === "JA" ? "該当する機能登録が見得つかりません" : langCode === "ES" ? "No se encontraron capacidades registradas coincidentes" : "No matching registered capabilities found"}
+                />
               )}
             </TableBody>
-          </Table>
-        </div>
-      </ScrollArea>
+      </Table>
     </div>
   );
 }

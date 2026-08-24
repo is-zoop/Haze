@@ -18,6 +18,8 @@ class McpDeployTaskData(StrictModel):
     """任务ID"""
     capability_id: int
     """关联能力ID"""
+    capability_name: str | None
+    """关联能力名称"""
     version_id: int | None
     """关联版本ID，首次 deploy 时关联当前最新版本"""
     version: str | None
@@ -121,6 +123,18 @@ class McpDeploymentListData(StrictModel):
     total: int
 
 
+class McpRuntimeCapabilityOption(StrictModel):
+    """运行监控筛选用的 MCP 能力选项。"""
+
+    id: int
+    name: str
+
+
+class McpRuntimeCapabilityOptionListData(StrictModel):
+    """运行监控筛选能力选项列表。"""
+
+    items: list[McpRuntimeCapabilityOption]
+
 # ── 调用日志 ─────────────────────────────────────────────────────────────────
 
 class McpCallLogData(StrictModel):
@@ -130,6 +144,8 @@ class McpCallLogData(StrictModel):
     """日志ID"""
     capability_id: int
     """关联能力ID"""
+    capability_name: str | None
+    """关联能力名称"""
     deployment_id: int | None
     """关联部署实例ID"""
     asset_code: str
@@ -159,7 +175,7 @@ class McpCallLogData(StrictModel):
 
 
 class McpCallLogListData(StrictModel):
-    """调用日志列表及今日聚合指标。"""
+    """调用日志列表及当前查询范围的聚合指标。"""
 
     items: list[McpCallLogData]
     total: int
@@ -167,6 +183,9 @@ class McpCallLogListData(StrictModel):
     today_errors: int
     success_rate: float | None
     avg_duration_ms: int | None
+    period_total: int
+    period_errors: int
+    available_methods: list[str]
 
 
 # ── 操作任务创建结果 ─────────────────────────────────────────────────────────

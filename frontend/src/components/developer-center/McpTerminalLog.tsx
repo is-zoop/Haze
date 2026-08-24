@@ -1,4 +1,4 @@
-import { Copy, Terminal, Trash2 } from "lucide-react";
+import { Copy, Download, Terminal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface McpTerminalLogProps {
@@ -6,6 +6,9 @@ interface McpTerminalLogProps {
   langCode: string;
   onClearLogs: () => void;
   onTriggerAlert: (msg: string) => void;
+  onExportLogs?: () => void;
+  exportLabel?: string;
+  exportDisabled?: boolean;
 }
 
 export function McpTerminalLog({
@@ -13,6 +16,9 @@ export function McpTerminalLog({
   langCode,
   onClearLogs,
   onTriggerAlert,
+  onExportLogs,
+  exportLabel,
+  exportDisabled = false,
 }: McpTerminalLogProps) {
   const handleCopyLogs = () => {
     const plainText = terminalLogs
@@ -38,16 +44,29 @@ export function McpTerminalLog({
             : "Debug Test Logs"}
         </span>
 
-        {/* Clear logs operations */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onClearLogs}
-          className="h-7 px-2.5 text-xs bg-white border-slate-200 text-slate-500 hover:text-slate-800 rounded-md transition-colors cursor-pointer select-none"
-        >
-          <Trash2 className="h-3.5 w-3.5 mr-1 text-slate-400 inline" />
-          {langCode === "ZH" ? "清空日志" : "Clear Logs"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {onExportLogs && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onExportLogs}
+              disabled={exportDisabled}
+              className="h-7 px-2.5 text-xs bg-white border-slate-200 text-slate-500 hover:text-slate-800 rounded-md transition-colors cursor-pointer select-none"
+            >
+              <Download className="h-3.5 w-3.5 mr-1 text-slate-400 inline" />
+              {exportLabel}
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClearLogs}
+            className="h-7 px-2.5 text-xs bg-white border-slate-200 text-slate-500 hover:text-slate-800 rounded-md transition-colors cursor-pointer select-none"
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1 text-slate-400 inline" />
+            {langCode === "ZH" ? "清空日志" : "Clear Logs"}
+          </Button>
+        </div>
       </div>
 
       {/* Dark Monospace Terminal Logs Frame */}

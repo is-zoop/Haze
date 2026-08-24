@@ -45,6 +45,7 @@ export interface McpDeployment {
 export interface McpCallLog {
   id: number;
   capability_id: number;
+  capability_name: string | null;
   deployment_id: number | null;
   asset_code: string;
   request_id: string | null;
@@ -63,6 +64,7 @@ export interface McpCallLog {
 export interface McpDeployTask {
   id: number;
   capability_id: number;
+  capability_name: string | null;
   version_id: number | null;
   version: string | null;
   task_type: string;
@@ -77,8 +79,8 @@ export interface McpDeployTask {
 }
 
 interface McpDeploymentListData { items: McpDeployment[]; total: number; }
-interface McpDeployTaskListData { items: McpDeployTask[]; total: number; }
-export interface McpCallLogListData { items: McpCallLog[]; total: number; today_total: number; today_errors: number; success_rate: number | null; avg_duration_ms: number | null; }
+export interface McpDeployTaskListData { items: McpDeployTask[]; total: number; }
+export interface McpCallLogListData { items: McpCallLog[]; total: number; today_total: number; today_errors: number; success_rate: number | null; avg_duration_ms: number | null; period_total: number; period_errors: number; available_methods: string[]; }
 
 interface ApiPackageFile {
   name: string;
@@ -361,6 +363,47 @@ export async function listMcpDeployments(): Promise<McpDeployment[]> {
   return data.items;
 }
 
+export interface McpRuntimeCapabilityOption {
+  id: number;
+  name: string;
+}
+
+export interface McpRuntimeCapabilityOptionListData {
+  items: McpRuntimeCapabilityOption[];
+}
+export interface McpRuntimeRecordQuery {
+  capabilityName?: string;
+  capabilityIds?: number[];
+  startAt: string;
+  endAt: string;
+  methods?: string[];
+  page?: number;
+  pageSize?: number;
+}
+
+function mcpRuntimeRecordQuery(params: McpRuntimeRecordQuery): string {
+  const query = new URLSearchParams({
+    start_at: params.startAt,
+    end_at: params.endAt,
+    page: String(params.page ?? 1),
+    page_size: String(params.pageSize ?? 20),
+  });
+  if (params.capabilityName?.trim()) query.set("capability_name", params.capabilityName.trim());
+  params.capabilityIds?.forEach((id) => query.append("capability_ids", String(id)));
+  params.methods?.forEach((method) => query.append("methods", method));
+  return query.toString();
+}
+
+export async function listMcpRuntimeCapabilities(): Promise<McpRuntimeCapabilityOption[]> {
+  return (await apiRequest<McpRuntimeCapabilityOptionListData>("/api/mcp-runtime/capabilities")).data.items;
+}
+export async function listMcpRuntimeTasks(params: McpRuntimeRecordQuery): Promise<McpDeployTaskListData> {
+  return (await apiRequest<McpDeployTaskListData>(`/api/mcp-runtime/tasks?${mcpRuntimeRecordQuery(params)}`)).data;
+}
+
+export async function listMcpRuntimeCalls(params: McpRuntimeRecordQuery): Promise<McpCallLogListData> {
+  return (await apiRequest<McpCallLogListData>(`/api/mcp-runtime/calls?${mcpRuntimeRecordQuery(params)}`)).data;
+}
 export async function listMcpDeployTasks(deploymentId: number): Promise<McpDeployTask[]> {
   const data = (await apiRequest<McpDeployTaskListData>(`/api/mcp-runtime/deployments/${deploymentId}/tasks?page=1&page_size=20`)).data;
   return data.items;
@@ -373,6 +416,14 @@ export async function getMcpDeploymentLogs(deploymentId: number): Promise<string
   const response = await fetch(`/api/mcp-runtime/deployments/${deploymentId}/logs`, { headers });
   if (!response.ok) throw new Error(response.statusText || "Failed to load deployment logs");
   return response.text();
+}
+
+export function getMcpDeploymentDebugLog(deploymentId: number): Promise<Blob> {
+  return apiBlobRequest(`/api/mcp-runtime/deployments/${deploymentId}/debug-log`);
+}
+
+export function getCapabilityTestDebugLog(capabilityId: string): Promise<Blob> {
+  return apiBlobRequest(`/api/developer/capabilities/${capabilityId}/test-debug-log`);
 }
 
 export async function debugCapability(id: string): Promise<void> {

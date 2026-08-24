@@ -75,6 +75,7 @@ import { recordHomeCapabilityUsage } from "../../lib/home";
 import { PageHeader } from "../../components/common/PageHeader";
 import { DataTableFooter } from "../../components/common/DataTableFooter";
 import { EmptyState } from "../../components/common/EmptyState";
+import { TableSkeleton } from "../../components/common/TableSkeleton";
 
 SyntaxHighlighter.registerLanguage("bash", bash);
 SyntaxHighlighter.registerLanguage("javascript", javascript);
@@ -248,6 +249,7 @@ export function Market({
 }: MarketPageProps) {
   const t = getI18n(_langCode);
   const [skills, setSkills] = useState<CapabilityItem[]>([]);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [categories, setCategories] = useState<BusinessCategory[]>([]);
   const [mcps, setMcps] = useState<CapabilityItem[]>([]);
   const [totalItems, setTotalItems] = useState(0);
@@ -291,6 +293,7 @@ export function Market({
   const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
+    let active = true;
     const type = activeTypeTab === "Skill" ? "skill" : activeTypeTab === "MCP" ? "mcp" : undefined;
     listMarketCapabilities({
       page: currentPage,
@@ -300,6 +303,7 @@ export function Market({
       categoryId: selectedCategory === "all" ? undefined : Number(selectedCategory),
       favoriteOnly: showFavoritesOnly || undefined,
     }).then(({ items, total }) => {
+      if (!active) return;
       const toItem = (raw: typeof items[0]): CapabilityItem => {
         const versionHistory = raw.version_history ?? raw.versions ?? [];
         return {
@@ -332,7 +336,10 @@ export function Market({
       setSkills(items.filter((i) => i.type === "Skill").map(toItem));
       setMcps(items.filter((i) => i.type === "MCP").map(toItem));
       setTotalItems(total);
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      if (active) setIsInitialLoading(false);
+    });
+    return () => { active = false; };
   }, [currentPage, pageSize, searchQuery, activeTypeTab, selectedCategory, showFavoritesOnly]);
 
   const allItems = useMemo<MarketItem[]>(() => {
@@ -718,7 +725,7 @@ export function Market({
             </div>
 
             <ScrollArea className="min-h-0 flex-1 bg-slate-50/50">
-              {sortedAndFilteredItems.length === 0 ? (
+              {!isInitialLoading && sortedAndFilteredItems.length === 0 ? (
                 <EmptyState
                   title={t.noMatches}
                   description={t.noMatchesSub}
@@ -798,8 +805,8 @@ export function Market({
                   })}
                 </div>
               ) : (
-                <div className="p-4 overflow-x-auto">
-                  <div className="inline-block min-w-full align-middle">
+                <div className="min-w-0 p-4">
+                  <div className="min-w-0">
                     <div className="overflow-hidden border border-slate-100 rounded-xl bg-white shadow-3xs">
                       <Table>
                         <TableHeader>
@@ -814,8 +821,10 @@ export function Market({
                             <TableHead data-table-action="true">操作</TableHead>
                           </TableRow>
                         </TableHeader>
-                        <TableBody>
-                          {paginatedItems.map((item) => {
+                        <TableBody aria-busy={isInitialLoading}>
+                          {isInitialLoading ? (
+                            <TableSkeleton columnCount={8} leadingVisual actionColumn />
+                          ) : paginatedItems.map((item) => {
                             const display = getCopy(item);
                             return (
                               <TableRow key={item.id}>
